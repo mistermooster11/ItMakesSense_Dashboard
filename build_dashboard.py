@@ -104,18 +104,57 @@ dev_rows     = sheet_rows(wb['🛠️ Dev Tracker'])
 campaign_log = sheet_rows(wb['📊 Campaign Log'])
 dev_map      = {str(r['Lead ID']):r for r in dev_rows}
 
-brief_map = {}
-brief_content = {}
+INTEL_DIR = os.path.join(BRIEFS_DIR, 'Intel')
+DOCS_DIR  = os.path.join(BASE_DIR, 'Docs')
+
+def parse_sections(md_content):
+    """Split markdown into {heading: body} by ## headers."""
+    sections = {}
+    current = '__intro__'
+    buf = []
+    for line in md_content.splitlines():
+        if line.startswith('## '):
+            sections[current] = '\n'.join(buf).strip()
+            current = line[3:].strip()
+            buf = []
+        else:
+            buf.append(line)
+    sections[current] = '\n'.join(buf).strip()
+    return sections
+
+def read_doc(filename):
+    path = os.path.join(DOCS_DIR, filename)
+    if not os.path.exists(path): return {}
+    with open(path, encoding='utf-8') as f: return parse_sections(f.read())
+
+brief_map      = {}   # phone -> filename
+brief_sections = {}   # phone -> parsed sections dict
 if os.path.exists(BRIEFS_DIR):
     for f in sorted(os.listdir(BRIEFS_DIR)):
-        if f.endswith('.md') and not f.startswith('_'):
+        fpath = os.path.join(BRIEFS_DIR, f)
+        if f.endswith('.md') and not f.startswith('_') and os.path.isfile(fpath):
             phone_key = f.split('-')[0]
             brief_map[phone_key] = f
             try:
-                with open(os.path.join(BRIEFS_DIR, f), encoding='utf-8') as bf:
-                    brief_content[phone_key] = bf.read()
+                with open(fpath, encoding='utf-8') as bf:
+                    brief_sections[phone_key] = parse_sections(bf.read())
             except Exception:
-                brief_content[phone_key] = ''
+                brief_sections[phone_key] = {}
+
+intel_map = {}        # phone -> parsed sections dict
+if os.path.exists(INTEL_DIR):
+    for f in sorted(os.listdir(INTEL_DIR)):
+        fpath = os.path.join(INTEL_DIR, f)
+        if f.endswith('.md') and os.path.isfile(fpath):
+            phone_key = f.split('-')[0]
+            try:
+                with open(fpath, encoding='utf-8') as inf:
+                    intel_map[phone_key] = parse_sections(inf.read())
+            except Exception:
+                pass
+
+playbook  = read_doc('QF_Sales_Playbook.md')
+trade_ref = read_doc('QF_Trade_Value_Reference.md')
 
 for lead in all_leads:
     lid = str(lead.get('Lead ID',''))
@@ -127,7 +166,7 @@ for lead in all_leads:
     phone_raw = str(lead.get('Phone','')).replace('(','').replace(')','').replace('-','').replace(' ','').replace('+1','')
     lead['Has Brief']  = phone_raw in brief_map
     lead['Brief File'] = brief_map.get(phone_raw, '')
-    lead['Brief Content'] = brief_content.get(phone_raw, '')
+    lead['Has Intel']  = phone_raw in intel_map
     biz  = str(lead.get('Business Name','') or '')
     addr = str(lead.get('Address','') or lead.get('ZIP / Area','') or '')
     lead['Maps URL'] = 'https://www.google.com/maps/search/?api=1&query=' + urllib.parse.quote_plus((biz+' '+addr).strip())
@@ -139,8 +178,40 @@ for lead in all_leads:
     else:
         lead['lat'] = lead['lng'] = None
 
-briefs_by_id = {str(l.get('Lead ID','')): l.get('Brief Content','')
-                for l in all_leads if l.get('Brief Content')}
+# Build campaign ZIP -> income lookup
+camp_zip_income = {}
+for c in campaign_log:
+    z = str(c.get('ZIP Code','') or '').strip()
+    if z: camp_zip_income[z] = str(c.get('Per Capita Income','') or '')
+
+# Build SALES_PORTALS: one entry per lead that has a brief
+sales_portals = {}
+for lead in all_leads:
+    phone_raw = str(lead.get('Phone','')).replace('(','').replace(')','').replace('-','').replace(' ','').replace('+1','')
+    if phone_raw not in brief_map:
+        continue
+    lid      = str(lead.get('Lead ID',''))
+    zip_area = str(lead.get('ZIP / Area','') or '')
+    zip_income = next((inc for z,inc in camp_zip_income.items() if z in zip_area), '')
+    website_raw = str(lead.get('Website','') or '')
+    sales_portals[lid] = {
+        'biz':       str(lead.get('Business Name','') or ''),
+        'trade':     str(lead.get('Trade','') or ''),
+        'phone':     str(lead.get('Phone','') or ''),
+        'address':   str(lead.get('Address','') or ''),
+        'zip_area':  zip_area,
+        'rating':    lead.get('Rating ★',''),
+        'reviews':   lead.get('Reviews',''),
+        'website':   website_raw if website_raw.startswith('http') else '',
+        'demo_url':  str(lead.get('Staging URL','') or ''),
+        'maps_url':  str(lead.get('Maps URL','') or ''),
+        'dev_stage': str(lead.get('Dev Stage','') or ''),
+        'zip_income':zip_income,
+        'brief':     brief_sections.get(phone_raw, {}),
+        'intel':     intel_map.get(phone_raw, None),
+        'has_intel': phone_raw in intel_map,
+    }
+
 leads_clean    = [clean(r) for r in all_leads]
 dev_clean      = [clean(r) for r in dev_rows]
 campaign_clean = [clean(r) for r in campaign_log]
@@ -163,7 +234,9 @@ data_js = f"""const LEADS={json.dumps(leads_clean,ensure_ascii=False)};
 const DEV_ROWS={json.dumps(dev_clean,ensure_ascii=False)};
 const CAMPAIGN_LOG={json.dumps(campaign_clean,ensure_ascii=False)};
 const KPIS={json.dumps(kpis,ensure_ascii=False)};
-const BRIEFS={json.dumps(briefs_by_id,ensure_ascii=False)};
+const SALES_PORTALS={json.dumps(sales_portals,ensure_ascii=False)};
+const PLAYBOOK={json.dumps(playbook,ensure_ascii=False)};
+const TRADE_REF={json.dumps(trade_ref,ensure_ascii=False)};
 const REFRESHED="{datetime.date.today()}";
 """
 
@@ -562,7 +635,7 @@ tr:hover td{background:rgba(0,212,255,.04)}
       <th onclick="sortTable('salesTable',2)">ZIP / Area</th>
       <th onclick="sortTable('salesTable',3)">Phone</th>
       <th>Staging Site</th>
-      <th>Brief</th>
+      <th>Portal / Intel</th>
       <th onclick="sortTable('salesTable',6)">Rating</th>
       <th onclick="sortTable('salesTable',7)">Reviews</th>
       <th>Status</th>
@@ -712,20 +785,90 @@ function websiteBadge(w){
   return no?'<span class="badge b-nosite">No Site</span>':'<span class="badge b-yes">Has Site</span>';
 }
 function openBrief(id,biz){
-  const md=BRIEFS[id]||'';
-  const html=typeof marked!=='undefined'?marked.parse(md):'<pre>'+md.replace(/</g,'&lt;')+'</pre>';
+  const p=SALES_PORTALS&&SALES_PORTALS[id];
+  if(!p){alert('No portal data for this lead.');return;}
+  function sec(obj,prefix){if(!obj)return'';const k=Object.keys(obj).find(k=>k.toUpperCase().includes(prefix.toUpperCase()));return k?obj[k]:'';}
+  function m(text){if(!text)return'<p style="color:#2a4060;font-style:italic">&#x2014;</p>';return'<div>'+text.replace(/\n\n/g,'</div><div style="margin-top:8px">').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/^> (.+)$/gm,'<blockquote>$1</blockquote>').replace(/^#{1,3} (.+)$/gm,'<h3>$1</h3>').replace(/^- (.+)$/gm,'<li>$1</li>').replace(/(<li>.*<\/li>)/gs,'<ul>$1</ul>').replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank">$1</a>')+'</div>';}
+  function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  const snapHtml=m(sec(p.brief,'BUSINESS SNAPSHOT'));
+  const mktHtml=m(sec(p.brief,'MARKET CONTEXT'));
+  const preCallRaw=sec(p.brief,'STEP 0')||sec(p.brief,'PRE-CALL DEMO');
+  const callBridgeHtml=m(preCallRaw);
+  const notesHtml=m(sec(p.brief,'NOTES'));
+  const callScriptHtml=m(sec(p.brief,'CALL SCRIPT'));
+  const roiHtml=m(sec(p.brief,'COST OF A LOST'));
+  const compHtml=m(sec(p.brief,'COMPETITIVE LANDSCAPE'));
+  const briefObjRaw=sec(p.brief,'OBJECTION')||sec(PLAYBOOK,'PART 6');
+  const briefObjHtml=m(briefObjRaw);
+  const anglesHtml=m(sec(PLAYBOOK,'PART 1'));
+  const tradeLinesHtml=m(sec(TRADE_REF,'QUICK-REFERENCE CALL LINES'));
+  const vcallFlowHtml=m(sec(PLAYBOOK,'PART 5'));
+  const msgM=preCallRaw.match(/---\n([\s\S]+?)\n---/);
+  const copyMsg=msgM?msgM[1].trim():'';
+  const copyMsgEsc=esc(copyMsg);
+  const intelSERP=p.has_intel?m(sec(p.intel,'KEYWORD DEMAND')):'';
+  const intelComp=p.has_intel?m(sec(p.intel,"WHO'S WINNING")):'';
+  const intelAI=p.has_intel?m(sec(p.intel,'AI VISIBILITY')):'';
+  const intelAudit=p.has_intel?m(sec(p.intel,'SITE AUDIT')||sec(p.intel,'CURRENT SITE')):'';
+  const intelVcall=p.has_intel?m(sec(p.intel,'VIDEO CALL')+'\n\n---\n\n'+sec(p.intel,'CALL TO ACTION')):'';
+  const stageBadge=p.dev_stage.includes('Completed')
+    ?'<span style="background:rgba(0,255,157,.12);color:#00ff9d;border:1px solid rgba(0,255,157,.3);padding:2px 8px;border-radius:2px;font-size:11px;font-weight:600">&#x2705; Pitch Ready</span>'
+    :p.dev_stage?'<span style="background:rgba(245,196,0,.1);color:#f5c400;border:1px solid rgba(245,196,0,.3);padding:2px 8px;border-radius:2px;font-size:11px">'+esc(p.dev_stage)+'</span>':'';
+  const intelBadge=p.has_intel
+    ?'<span style="background:rgba(0,255,157,.1);color:#00ff9d;border:1px solid rgba(0,255,157,.25);padding:2px 8px;border-radius:2px;font-size:11px;font-weight:600">&#x1F7E2; Full Intel</span>'
+    :'<span style="background:rgba(245,196,0,.08);color:#f5c400;border:1px solid rgba(245,196,0,.2);padding:2px 8px;border-radius:2px;font-size:11px">&#x1F7E1; Standard Brief</span>';
+  const intelTabContent=p.has_intel
+    ?'<div class="tier-full tier-banner">&#x1F7E2; Full Intel &#x2014; Tier 2. Walk through this on the video call.</div>'
+     +'<div class="panel"><div class="panel-title">Keyword Demand &amp; SERP Analysis</div><div class="panel-body">'+intelSERP+'</div></div>'
+     +'<div class="panel"><div class="panel-title">Top Competitors</div><div class="panel-body">'+intelComp+'</div></div>'
+     +'<div class="panel"><div class="panel-title">AI Visibility Assessment</div><div class="panel-body">'+intelAI+'</div></div>'
+     +'<div class="panel"><div class="panel-title">Current Site Audit</div><div class="panel-body">'+intelAudit+'</div></div>'
+    :'<div class="tier-std tier-banner">&#x1F7E1; Standard Brief (Tier 1) &#x2014; Run /lead-intel after video call confirmed to unlock full intel.</div>'
+     +'<div class="panel"><div class="panel-title">Competitive Landscape</div><div class="panel-body">'+compHtml+'</div></div>';
+  const stratVcall=p.has_intel
+    ?'<div class="panel"><div class="panel-title">Video Call Talking Points &amp; Close</div><div class="panel-body">'+intelVcall+'</div></div>'
+    :'<div class="panel"><div class="panel-title">Video Call Flow (Playbook)</div><div class="panel-body">'+vcallFlowHtml+'</div></div>';
+  const copyBlock=copyMsg
+    ?'<div class="copy-block"><div class="copy-hdr"><span>Copy-Paste Message</span><button class="copy-btn" id="cpbtn" onclick="doCopy()">&#x1F4CB; Copy</button></div><div class="copy-msg" id="copytxt">'+copyMsgEsc+'</div></div>'
+    :'';
+  const css='*{box-sizing:border-box;margin:0;padding:0}:root{--c:#00d4ff;--g:#00ff9d;--y:#f5c400;--bg:#060b18;--panel:#0d1528;--border:rgba(0,212,255,.2)}body{font-family:\'Rajdhani\',sans-serif;background:var(--bg);color:#c8d8e8;min-height:100vh}body::before{content:\'\';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}a{color:var(--c);text-decoration:none}.hdr{position:relative;z-index:10;background:linear-gradient(180deg,rgba(0,20,50,.98),rgba(6,11,24,.95));border-bottom:1px solid var(--border);padding:14px 24px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.hdr-title{font-size:22px;font-weight:700;letter-spacing:2px;color:var(--c);text-shadow:0 0 12px rgba(0,212,255,.6);margin-bottom:6px}.hdr-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.hdr-contact{font-size:13px;color:#4a7090;display:flex;gap:16px;flex-wrap:wrap}.hdr-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0}.btn-demo{background:linear-gradient(90deg,rgba(0,255,157,.15),rgba(0,212,255,.1));border:1px solid rgba(0,255,157,.4);color:var(--g);padding:9px 18px;border-radius:3px;font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-decoration:none;display:inline-block}.btn-site{background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);color:#4a9090;padding:6px 14px;border-radius:3px;font-family:\'Rajdhani\',sans-serif;font-size:12px;text-decoration:none;display:inline-block}.tab-nav{position:relative;z-index:10;display:flex;background:rgba(6,11,24,.95);border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto}.tab-btn{padding:11px 22px;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#3a5570;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;font-family:\'Rajdhani\',sans-serif}.tab-btn:hover{color:#0090cc}.tab-btn.active{color:var(--c);border-bottom-color:var(--c)}.tab-body{display:none;padding:20px 24px;position:relative;z-index:2;max-width:980px;margin:0 auto}.tab-body.active{display:block}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:680px){.two-col{grid-template-columns:1fr}}.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;margin-bottom:16px;overflow:hidden;position:relative}.panel::before{content:\'\';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--c),transparent);opacity:.3}.panel-title{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#3a7090;padding:10px 16px 8px;border-bottom:1px solid rgba(0,212,255,.08)}.panel-body{padding:14px 16px}.panel-body h1,.panel-body h2,.panel-body h3{color:var(--c);margin:14px 0 6px;letter-spacing:.5px}.panel-body h1{font-size:17px}.panel-body h2{font-size:15px}.panel-body h3{font-size:14px;color:#8ab0c8}.panel-body p,.panel-body div{margin-bottom:8px;font-size:13px;line-height:1.65}.panel-body ul{margin:6px 0 10px 22px;list-style:disc}.panel-body li{margin-bottom:4px;font-size:13px;line-height:1.5}.panel-body strong{color:var(--y)}.panel-body em{color:#a78bfa}.panel-body blockquote{border-left:3px solid rgba(0,212,255,.4);padding:6px 14px;margin:8px 0;color:#8ab0c8;font-size:13px;background:rgba(0,212,255,.03);border-radius:0 3px 3px 0}.panel-body table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}.panel-body th{background:rgba(0,212,255,.06);padding:7px 10px;text-align:left;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#2a6080;border-bottom:1px solid rgba(0,212,255,.1)}.panel-body td{padding:6px 10px;border-bottom:1px solid rgba(0,212,255,.05);font-size:13px}.panel-body tr:hover td{background:rgba(0,212,255,.03)}.panel-body hr{border:none;border-top:1px solid rgba(0,212,255,.1);margin:14px 0}.copy-block{background:#070e1c;border:1px solid rgba(0,255,157,.2);border-radius:3px;margin:12px 0}.copy-hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid rgba(0,255,157,.1)}.copy-hdr span{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#2a7060}.copy-btn{background:rgba(0,255,157,.1);border:1px solid rgba(0,255,157,.3);color:var(--g);padding:5px 14px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}.copy-btn:hover{background:rgba(0,255,157,.2)}.copy-msg{padding:14px;font-size:13px;color:#8ab8a8;line-height:1.7;white-space:pre-wrap;font-family:\'Rajdhani\',sans-serif}.tier-banner{padding:10px 16px;margin-bottom:16px;border-radius:3px;font-size:13px;font-weight:600;letter-spacing:.5px}.tier-full{background:rgba(0,255,157,.07);border:1px solid rgba(0,255,157,.25);color:var(--g)}.tier-std{background:rgba(245,196,0,.07);border:1px solid rgba(245,196,0,.2);color:var(--y)}';
+  const portalHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>'+esc(biz)+' &#x2014; Sales Portal</title>'
+    +'<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>'
+    +'<style>'+css+'</style></head><body>'
+    +'<div class="hdr"><div>'
+    +'<div class="hdr-title">'+esc(biz)+'</div>'
+    +'<div class="hdr-meta"><span style="background:rgba(0,212,255,.08);color:#4a9090;border:1px solid rgba(0,212,255,.2);padding:2px 9px;border-radius:2px;font-size:11px;letter-spacing:1px">'+esc(p.trade)+'</span>'
+    +' <span style="font-size:13px;color:#f5c400">&#9733; '+esc(String(p.rating||''))+' <span style="color:#3a6080">('+esc(String(p.reviews||''))+' reviews)</span></span>'
+    +' '+stageBadge+' '+intelBadge+'</div>'
+    +'<div class="hdr-contact">'+(p.phone?'<span>&#x1F4DE; <a href="tel:'+p.phone.replace(/\D/g,'')+'" style="color:#00ff9d;font-weight:600">'+esc(p.phone)+'</a></span>':'')+' '+(p.address?'<span>&#x1F4CD; <a href="'+p.maps_url+'" target="_blank" style="color:#6aaa9a">'+esc(p.address)+'</a></span>':'')+' '+(p.zip_income?'<span>&#x1F4B0; Per Capita Income: <span style="color:#00ff9d;font-weight:600">'+esc(p.zip_income)+'</span></span>':'')+'</div>'
+    +'</div><div class="hdr-actions">'+(p.demo_url?'<a href="'+p.demo_url+'" target="_blank" class="btn-demo">&#x1F310; View Demo Site &#x2197;</a>':'')+' '+(p.website?'<a href="'+p.website+'" target="_blank" class="btn-site">&#x1F517; Current Site &#x2197;</a>':'')+'</div></div>'
+    +'<div class="tab-nav">'
+    +'<button class="tab-btn active" onclick="showTab(this,\'overview\')">&#x1F4CB; Overview</button>'
+    +'<button class="tab-btn" onclick="showTab(this,\'outreach\')">&#x1F4E8; Outreach</button>'
+    +'<button class="tab-btn" onclick="showTab(this,\'intel\')">&#x1F50D; Intel</button>'
+    +'<button class="tab-btn" onclick="showTab(this,\'strategy\')">&#x26A1; Strategy</button>'
+    +'</div>'
+    +'<div id="tab-overview" class="tab-body active"><div class="two-col">'
+    +'<div class="panel"><div class="panel-title">Business Snapshot</div><div class="panel-body">'+snapHtml+'</div></div>'
+    +'<div class="panel"><div class="panel-title">Market Context</div><div class="panel-body">'+mktHtml+'</div></div>'
+    +'</div></div>'
+    +'<div id="tab-outreach" class="tab-body">'
+    +'<div class="panel"><div class="panel-title">Pre-Call Demo Drop</div><div class="panel-body">'+copyBlock+callBridgeHtml+'</div></div>'
+    +'<div class="panel"><div class="panel-title">Notes &amp; Best Call Times</div><div class="panel-body">'+notesHtml+'</div></div>'
+    +'</div>'
+    +'<div id="tab-intel" class="tab-body">'+intelTabContent+'</div>'
+    +'<div id="tab-strategy" class="tab-body">'
+    +'<div class="panel"><div class="panel-title">Call Script</div><div class="panel-body">'+callScriptHtml+'</div></div>'
+    +stratVcall
+    +'<div class="panel"><div class="panel-title">Cost of a Lost Customer</div><div class="panel-body">'+roiHtml+'</div></div>'
+    +'<div class="panel"><div class="panel-title">Objection Handling</div><div class="panel-body">'+briefObjHtml+'</div></div>'
+    +'<div class="panel"><div class="panel-title">Top 10 Angles &#x2014; Why a Website Matters</div><div class="panel-body">'+anglesHtml+'</div></div>'
+    +'<div class="panel"><div class="panel-title">Trade-Specific Call Lines</div><div class="panel-body">'+tradeLinesHtml+'</div></div>'
+    +'</div>'
+    +'<script>function showTab(btn,id){document.querySelectorAll(".tab-body").forEach(function(t){t.classList.remove("active")});document.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active")});document.getElementById("tab-"+id).classList.add("active");btn.classList.add("active");}function doCopy(){var t=document.getElementById("copytxt").innerText;if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){var b=document.getElementById("cpbtn");b.textContent="Copied!";setTimeout(function(){b.textContent="Copy"},2000)});}else{var r=document.createRange();r.selectNodeContents(document.getElementById("copytxt"));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand("copy");}}<\/script>'
+    +'</body></html>';
   const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${biz} — Sales Brief</title>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet"/>
-<style>body{background:#060b18;color:#c8d8e8;font-family:'Rajdhani',sans-serif;max-width:800px;margin:40px auto;padding:24px;line-height:1.65}
-h1,h2,h3{color:#00d4ff;letter-spacing:1px;margin:20px 0 8px}h1{font-size:26px;border-bottom:1px solid rgba(0,212,255,.3);padding-bottom:10px}
-h2{font-size:20px}h3{font-size:16px;color:#8ab0c8}p{margin-bottom:12px;font-size:15px}ul,ol{margin:8px 0 12px 22px}
-li{margin-bottom:4px;font-size:14px}strong{color:#f5c400}em{color:#a78bfa}
-hr{border:none;border-top:1px solid rgba(0,212,255,.2);margin:20px 0}
-code{background:#0d1528;color:#00ff9d;padding:2px 6px;border-radius:3px;font-family:monospace}
-pre{background:#0d1528;padding:16px;border-radius:4px;overflow-x:auto;border:1px solid rgba(0,212,255,.15)}
-blockquote{border-left:3px solid rgba(0,212,255,.4);padding-left:16px;color:#6a90a8;margin:12px 0}
-a{color:#00d4ff}</style></head><body>${html}</body></html>`);
+  w.document.write(portalHtml);
   w.document.close();
 }
 function linkCell(url,label){
@@ -834,7 +977,7 @@ function buildOverview(){
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
         ${noWeb?'<span class="badge b-nosite">No Site</span>':''}
-        ${l['Has Brief']?`<a href="#" onclick="openBrief('${l['Lead ID']}','${(l['Business Name']||'').replace(/'/g,"\\'")}');return false" style="color:#c084fc;font-size:10px" title="Sales Brief">📄</a>`:''}
+        ${l['Has Brief']?`<a href="#" onclick="openBrief('${l['Lead ID']}','${(l['Business Name']||'').replace(/'/g,"\\'")}');return false" style="color:#c084fc;font-size:10px" title="Sales Portal">🗂</a>`:''}
         <a href="${l['Maps URL']}" target="_blank" style="color:#00d4ff;font-size:10px" title="Google Maps">📍</a>
       </div>
     </div>`;
@@ -849,7 +992,7 @@ function buildOverview(){
       <td style="color:#4a7090">${l['Trade']||''}</td>
       <td>${l['Phone']?`<a href="tel:${l['Phone'].replace(/\D/g,'')}" style="color:#00ff9d">${l['Phone']}</a>`:'—'}</td>
       <td>${l['Staging URL']?`<a href="${l['Staging URL']}" target="_blank" style="color:#00d4ff;font-size:11px">🌐 Preview</a>`:'—'}</td>
-      <td>${l['Has Brief']?`<a href="#" onclick="openBrief('${l['Lead ID']}','${(l['Business Name']||'').replace(/'/g,"\\'")}');return false" style="color:#c084fc;font-size:11px">📄 Brief</a>`:'<span style="color:#2a4060">—</span>'}</td>
+      <td>${l['Has Brief']?`<a href="#" onclick="openBrief('${l['Lead ID']}','${(l['Business Name']||'').replace(/'/g,"\\'")}');return false" style="color:#c084fc;font-size:11px">🗂 Portal</a>`:'<span style="color:#2a4060">—</span>'}</td>
       <td><a href="${l['Maps URL']}" target="_blank" style="color:#4a9090;font-size:11px">📍 Map</a></td>`;
     sqBody.appendChild(tr);
   });
@@ -1010,7 +1153,7 @@ function filterSales(){
       <td style="font-size:11px;color:#3a6080">${l['ZIP / Area']||''}</td>
       <td>${phoneLink(l['Phone'])}</td>
       <td>${linkCell(l['Staging URL'],'🌐 Preview')}</td>
-      <td>${l['Has Brief']?`<a href="#" onclick="openBrief('${l['Lead ID']}','${(l['Business Name']||'').replace(/'/g,"\\'")}');return false" style="color:#c084fc;font-size:12px;font-weight:600">📄 Open Brief</a>`:'<span style="color:#2a4060">—</span>'}</td>
+      <td>${l['Has Brief']?`<a href="#" onclick="openBrief('${l['Lead ID']}','${(l['Business Name']||'').replace(/'/g,"\\'")}');return false" style="color:#c084fc;font-size:12px;font-weight:600;display:block">🗂 Portal</a><span style="font-size:10px">${l['Has Intel']?'<span style="color:#00ff9d">🟢 Full Intel</span>':'<span style="color:#f5c400">🟡 Brief Only</span>'}</span>`:'<span style="color:#2a4060">—</span>'}</td>
       <td style="color:#f5c400;font-family:\'Share Tech Mono\',monospace">${l['Rating ★']||''}★</td>
       <td style="color:#6a90a8">${l['Reviews']||''}</td>
       <td><span class="badge b-base">To Call</span></td>`;
