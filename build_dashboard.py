@@ -985,7 +985,7 @@ let salesLeads=[];
 function buildSales(){
   salesLeads=LEADS.filter(l=>l['Dev Stage']==='✅ Completed');
   document.getElementById('revenuePill').textContent=
-    '▶  '+salesLeads.length+' sites ready to pitch  ·  @ $1,500 avg  =  $'+(salesLeads.length*1500).toLocaleString()+' potential';
+    '▶  '+salesLeads.length+' sites ready to pitch  ·  @ $5,000 avg  =  $'+(salesLeads.length*5000).toLocaleString()+' potential';
   const trades=[...new Set(salesLeads.map(l=>l['Trade']).filter(Boolean))].sort();
   const sel=document.getElementById('salesTrade');
   trades.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o)});
