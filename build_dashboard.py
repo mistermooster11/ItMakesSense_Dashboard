@@ -194,6 +194,8 @@ for lead in all_leads:
     zip_area = str(lead.get('ZIP / Area','') or '')
     zip_income = next((inc for z,inc in camp_zip_income.items() if z in zip_area), '')
     website_raw = str(lead.get('Website','') or '')
+    brief_intro = brief_sections.get(phone_raw, {}).get('__intro__', '')
+    brief_meta = {mm.group(1).strip(): mm.group(2).strip() for mm in re.finditer(r'\*\*([^*:]+):\*\*\s*(.*)', brief_intro)}
     sales_portals[lid] = {
         'biz':       str(lead.get('Business Name','') or ''),
         'trade':     str(lead.get('Trade','') or ''),
@@ -210,6 +212,8 @@ for lead in all_leads:
         'brief':     brief_sections.get(phone_raw, {}),
         'intel':     intel_map.get(phone_raw, None),
         'has_intel': phone_raw in intel_map,
+        'owner':     brief_meta.get('Owner', ''),
+        'email':     brief_meta.get('Email', ''),
     }
 
 leads_clean    = [clean(r) for r in all_leads]
@@ -788,89 +792,181 @@ function openBrief(id,biz){
   const p=SALES_PORTALS&&SALES_PORTALS[id];
   if(!p){alert('No portal data for this lead.');return;}
   function sec(obj,prefix){if(!obj)return'';const k=Object.keys(obj).find(k=>k.toUpperCase().includes(prefix.toUpperCase()));return k?obj[k]:'';}
-  function m(text){if(!text)return'<p style="color:#2a4060;font-style:italic">&#x2014;</p>';return'<div>'+text.replace(/\n\n/g,'</div><div style="margin-top:8px">').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/^> (.+)$/gm,'<blockquote>$1</blockquote>').replace(/^#{1,3} (.+)$/gm,'<h3>$1</h3>').replace(/^- (.+)$/gm,'<li>$1</li>').replace(/(<li>.*<\/li>)/gs,'<ul>$1</ul>').replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank">$1</a>')+'</div>';}
+  function m(text){if(!text)return'<p style="color:#2a4060;font-style:italic">&#x2014;</p>';if(typeof marked!=='undefined')return marked.parse(text);return'<div>'+text.replace(/&/g,'&amp;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')+'</div>';}
   function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  // ── Data extraction
   const snapHtml=m(sec(p.brief,'BUSINESS SNAPSHOT'));
   const mktHtml=m(sec(p.brief,'MARKET CONTEXT'));
-  const preCallRaw=sec(p.brief,'STEP 0')||sec(p.brief,'PRE-CALL DEMO');
-  const callBridgeHtml=m(preCallRaw);
-  const notesHtml=m(sec(p.brief,'NOTES'));
-  const callScriptHtml=m(sec(p.brief,'CALL SCRIPT'));
   const roiHtml=m(sec(p.brief,'COST OF A LOST'));
-  const compHtml=m(sec(p.brief,'COMPETITIVE LANDSCAPE'));
+  const notesHtml=m(sec(p.brief,'NOTES'));
+  const step0Raw=sec(p.brief,'STEP 0')||sec(p.brief,'PRE-CALL DEMO');
+  const timingM=step0Raw.match(/^([\s\S]*?)(?=\n---)/);
+  const sendTiming=timingM?timingM[1].trim():'';
+  const msgM=step0Raw.match(/---\n([\s\S]+?)\n---/);
+  const preCallMsg=msgM?msgM[1].trim():'';
+  const bridgeM=step0Raw.match(/\*\*On the call[\s\S]*?(?=\*\*Opening —|$)/i);
+  const callBridgeRaw=bridgeM?bridgeM[0].trim():'';
+  const coldM=step0Raw.match(/\*\*Opening — cold[\s\S]*?(?=\n\*\*Call friction|\n> ⚠️|\n---\n|$)/i);
+  const coldOpenRaw=coldM?coldM[0].trim():'';
+  const callScriptHtml=m(sec(p.brief,'CALL SCRIPT'));
   const briefObjRaw=sec(p.brief,'OBJECTION')||sec(PLAYBOOK,'PART 6');
   const briefObjHtml=m(briefObjRaw);
   const anglesHtml=m(sec(PLAYBOOK,'PART 1'));
-  const tradeLinesHtml=m(sec(TRADE_REF,'QUICK-REFERENCE CALL LINES'));
-  const vcallFlowHtml=m(sec(PLAYBOOK,'PART 5'));
-  const msgM=preCallRaw.match(/---\n([\s\S]+?)\n---/);
-  const copyMsg=msgM?msgM[1].trim():'';
-  const copyMsgEsc=esc(copyMsg);
-  const intelSERP=p.has_intel?m(sec(p.intel,'KEYWORD DEMAND')):'';
-  const intelComp=p.has_intel?m(sec(p.intel,"WHO'S WINNING")):'';
-  const intelAI=p.has_intel?m(sec(p.intel,'AI VISIBILITY')):'';
-  const intelAudit=p.has_intel?m(sec(p.intel,'SITE AUDIT')||sec(p.intel,'CURRENT SITE')):'';
-  const intelVcall=p.has_intel?m(sec(p.intel,'VIDEO CALL')+'\n\n---\n\n'+sec(p.intel,'CALL TO ACTION')):'';
-  const stageBadge=p.dev_stage.includes('Completed')
+  // Trade-specific call line
+  const tradeCallSection=sec(TRADE_REF,'QUICK-REFERENCE CALL LINES');
+  let tradeCallHtml='';
+  if(tradeCallSection){
+    const tl=(p.trade||'').toLowerCase();
+    const parts=('\n'+tradeCallSection).split(/\n### /);
+    let match='';
+    for(let i=1;i<parts.length;i++){
+      const fl=parts[i].split('\n')[0].toLowerCase();
+      if((tl.includes('electric')&&fl.includes('electrician'))||(tl.includes('plumb')&&fl.includes('plumber'))||(tl.includes('hvac')&&fl.includes('hvac'))||(tl.includes('roof')&&fl.includes('roofer'))||((tl.includes('gc')||tl.includes('general')||tl.includes('remodel'))&&fl.includes('gc'))){match='### '+parts[i];break;}
+    }
+    tradeCallHtml=m(match||tradeCallSection);
+  }
+  const vcallRaw=p.has_intel?sec(p.intel,'VIDEO CALL')+'\n\n---\n\n'+sec(p.intel,'CALL TO ACTION'):sec(PLAYBOOK,'PART 5');
+  const vcallHtml=m(vcallRaw);
+  const vcallTitle=p.has_intel?'Video Call Talking Points &amp; Close':'Video Call Flow (Playbook)';
+  // ── Intel tab
+  let intelTabContent='';
+  if(p.has_intel){
+    const serpRaw=sec(p.intel,'KEYWORD DEMAND');
+    const keyObsM=serpRaw.match(/\*\*Key observation:\*\*([\s\S]*?)(?:\n\n|$)/);
+    const keyObs=keyObsM?keyObsM[1].trim():'';
+    const compRaw=sec(p.intel,"WHO'S WINNING");
+    const compParts=('\n'+compRaw).split(/\n### /);
+    let compCards='';
+    for(let i=1;i<compParts.length;i++){
+      const lines=compParts[i].split('\n');
+      const name=lines[0].trim();
+      const attrs={};
+      lines.slice(1).forEach(function(l){const am=l.match(/^-\s+\*\*([^*:]+):\*\*\s*(.*)/);if(am)attrs[am[1].trim()]=am[2].trim();});
+      compCards+='<div style="background:rgba(0,20,50,.6);border:1px solid rgba(0,212,255,.12);border-radius:3px;padding:12px 14px;margin-bottom:10px">'
+        +'<div style="font-size:14px;font-weight:700;color:#00d4ff;margin-bottom:8px">'+esc(name)+'</div>'
+        +(attrs['Differentiator']?'<div style="margin-bottom:6px;font-size:13px"><span style="color:#f5c400;font-weight:600;font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-right:4px">Edge:</span>'+esc(attrs['Differentiator'])+'</div>':'')
+        +(attrs['Why they rank']?'<div style="margin-bottom:6px;font-size:13px"><span style="color:#00ff9d;font-weight:600;font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-right:4px">Why ranking:</span>'+esc(attrs['Why they rank'])+'</div>':'')
+        +(attrs['Weakness']?'<div style="font-size:13px"><span style="color:#f87171;font-weight:600;font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-right:4px">Weakness:</span>'+esc(attrs['Weakness'])+'</div>':'')
+        +'</div>';
+    }
+    if(!compCards)compCards=m(compRaw);
+    const auditRaw=sec(p.intel,'SITE AUDIT')||sec(p.intel,'CURRENT SITE');
+    const bottomLineM=auditRaw.match(/\*\*Bottom line:\*\*([\s\S]*?)(?:\n\n|$)/);
+    const bottomLine=bottomLineM?bottomLineM[1].trim():'';
+    let auditTable='<table style="width:100%;border-collapse:collapse"><thead><tr>'
+      +'<th style="text-align:left;padding:7px 10px;font-size:11px;letter-spacing:1px;color:#2a6080;border-bottom:1px solid rgba(0,212,255,.12);background:rgba(0,212,255,.04)">Signal</th>'
+      +'<th style="text-align:left;padding:7px 10px;font-size:11px;letter-spacing:1px;color:#2a6080;border-bottom:1px solid rgba(0,212,255,.12);background:rgba(0,212,255,.04)">Status</th>'
+      +'<th style="text-align:left;padding:7px 10px;font-size:11px;letter-spacing:1px;color:#2a6080;border-bottom:1px solid rgba(0,212,255,.12);background:rgba(0,212,255,.04)">Notes</th>'
+      +'</tr></thead><tbody>';
+    let auditRows=0;
+    auditRaw.split('\n').forEach(function(l){
+      if(!l.startsWith('|')||l.includes('---'))return;
+      const cells=l.split('|').map(function(c){return c.trim();}).filter(function(c){return c;});
+      if(cells.length<2||cells[0].toLowerCase()==='signal')return;
+      const sig=cells[0]||'';const st=cells[1]||'';const notes=cells[2]||'';
+      let stHtml='<span style="color:#6a90a8">'+esc(st)+'</span>';
+      if(st.includes('❌'))stHtml='<span style="background:rgba(248,113,113,.12);color:#f87171;padding:2px 8px;border-radius:2px;font-weight:700;font-size:12px">❌ Missing</span>';
+      else if(st.includes('✅'))stHtml='<span style="background:rgba(0,255,157,.1);color:#00ff9d;padding:2px 8px;border-radius:2px;font-weight:700;font-size:12px">✅ Present</span>';
+      else if(st.includes('⚠'))stHtml='<span style="background:rgba(245,196,0,.1);color:#f5c400;padding:2px 8px;border-radius:2px;font-weight:700;font-size:12px">⚠️ Partial</span>';
+      auditTable+='<tr><td style="padding:7px 10px;border-bottom:1px solid rgba(0,212,255,.05);font-size:13px;font-weight:600;color:#c8d8e8">'+esc(sig)+'</td>'
+        +'<td style="padding:7px 10px;border-bottom:1px solid rgba(0,212,255,.05);white-space:nowrap">'+stHtml+'</td>'
+        +'<td style="padding:7px 10px;border-bottom:1px solid rgba(0,212,255,.05);font-size:12px;color:#6a90a8">'+esc(notes)+'</td></tr>';
+      auditRows++;
+    });
+    auditTable+='</tbody></table>';
+    if(!auditRows)auditTable=m(auditRaw);
+    const aiHtml=m(sec(p.intel,'AI VISIBILITY'));
+    intelTabContent=
+      '<div class="tier-full tier-banner">&#x1F7E2; Full Intel &#x2014; Tier 2. Walk through this on the video call.</div>'
+      +(keyObs?'<div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-left:4px solid #f87171;border-radius:3px;padding:14px 16px;margin-bottom:16px">'
+        +'<div style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#f87171;text-transform:uppercase;margin-bottom:6px">&#x26A0;&#xFE0F; Pain Point &#x2014; Key Observation</div>'
+        +'<div style="font-size:14px;color:#e8c8c8;line-height:1.65">'+esc(keyObs)+'</div>'
+        +'</div>':'')
+      +'<div class="panel"><div class="panel-title">Current Site Audit</div><div class="panel-body">'
+      +auditTable
+      +(bottomLine?'<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.25);border-left:3px solid #f87171;border-radius:2px;padding:10px 14px;margin-top:14px"><span style="font-size:11px;font-weight:700;letter-spacing:1px;color:#f87171;text-transform:uppercase">Bottom Line: </span><span style="font-size:13px;color:#c8a8a8">'+esc(bottomLine)+'</span></div>':'')
+      +'</div></div>'
+      +'<div class="panel"><div class="panel-title">Top Competitors</div><div class="panel-body">'+compCards+'</div></div>'
+      +(aiHtml?'<div class="panel"><div class="panel-title">AI Visibility Assessment</div><div class="panel-body">'+aiHtml+'</div></div>':'');
+  }else{
+    intelTabContent=
+      '<div class="tier-std tier-banner">&#x1F7E1; Standard Brief (Tier 1) &#x2014; Run /lead-intel after video call confirmed to unlock full intel.</div>'
+      +'<div class="panel"><div class="panel-title">Competitive Landscape</div><div class="panel-body">'+m(sec(p.brief,'COMPETITIVE LANDSCAPE'))+'</div></div>';
+  }
+  // ── Badges
+  const stageBadge=p.dev_stage&&p.dev_stage.includes('Completed')
     ?'<span style="background:rgba(0,255,157,.12);color:#00ff9d;border:1px solid rgba(0,255,157,.3);padding:2px 8px;border-radius:2px;font-size:11px;font-weight:600">&#x2705; Pitch Ready</span>'
     :p.dev_stage?'<span style="background:rgba(245,196,0,.1);color:#f5c400;border:1px solid rgba(245,196,0,.3);padding:2px 8px;border-radius:2px;font-size:11px">'+esc(p.dev_stage)+'</span>':'';
   const intelBadge=p.has_intel
     ?'<span style="background:rgba(0,255,157,.1);color:#00ff9d;border:1px solid rgba(0,255,157,.25);padding:2px 8px;border-radius:2px;font-size:11px;font-weight:600">&#x1F7E2; Full Intel</span>'
     :'<span style="background:rgba(245,196,0,.08);color:#f5c400;border:1px solid rgba(245,196,0,.2);padding:2px 8px;border-radius:2px;font-size:11px">&#x1F7E1; Standard Brief</span>';
-  const intelTabContent=p.has_intel
-    ?'<div class="tier-full tier-banner">&#x1F7E2; Full Intel &#x2014; Tier 2. Walk through this on the video call.</div>'
-     +'<div class="panel"><div class="panel-title">Keyword Demand &amp; SERP Analysis</div><div class="panel-body">'+intelSERP+'</div></div>'
-     +'<div class="panel"><div class="panel-title">Top Competitors</div><div class="panel-body">'+intelComp+'</div></div>'
-     +'<div class="panel"><div class="panel-title">AI Visibility Assessment</div><div class="panel-body">'+intelAI+'</div></div>'
-     +'<div class="panel"><div class="panel-title">Current Site Audit</div><div class="panel-body">'+intelAudit+'</div></div>'
-    :'<div class="tier-std tier-banner">&#x1F7E1; Standard Brief (Tier 1) &#x2014; Run /lead-intel after video call confirmed to unlock full intel.</div>'
-     +'<div class="panel"><div class="panel-title">Competitive Landscape</div><div class="panel-body">'+compHtml+'</div></div>';
-  const stratVcall=p.has_intel
-    ?'<div class="panel"><div class="panel-title">Video Call Talking Points &amp; Close</div><div class="panel-body">'+intelVcall+'</div></div>'
-    :'<div class="panel"><div class="panel-title">Video Call Flow (Playbook)</div><div class="panel-body">'+vcallFlowHtml+'</div></div>';
-  const copyBlock=copyMsg
-    ?'<div class="copy-block"><div class="copy-hdr"><span>Copy-Paste Message</span><button class="copy-btn" id="cpbtn" onclick="doCopy()">&#x1F4CB; Copy</button></div><div class="copy-msg" id="copytxt">'+copyMsgEsc+'</div></div>'
-    :'';
-  const css='*{box-sizing:border-box;margin:0;padding:0}:root{--c:#00d4ff;--g:#00ff9d;--y:#f5c400;--bg:#060b18;--panel:#0d1528;--border:rgba(0,212,255,.2)}body{font-family:\'Rajdhani\',sans-serif;background:var(--bg);color:#c8d8e8;min-height:100vh}body::before{content:\'\';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}a{color:var(--c);text-decoration:none}.hdr{position:relative;z-index:10;background:linear-gradient(180deg,rgba(0,20,50,.98),rgba(6,11,24,.95));border-bottom:1px solid var(--border);padding:14px 24px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.hdr-title{font-size:22px;font-weight:700;letter-spacing:2px;color:var(--c);text-shadow:0 0 12px rgba(0,212,255,.6);margin-bottom:6px}.hdr-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.hdr-contact{font-size:13px;color:#4a7090;display:flex;gap:16px;flex-wrap:wrap}.hdr-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0}.btn-demo{background:linear-gradient(90deg,rgba(0,255,157,.15),rgba(0,212,255,.1));border:1px solid rgba(0,255,157,.4);color:var(--g);padding:9px 18px;border-radius:3px;font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-decoration:none;display:inline-block}.btn-site{background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);color:#4a9090;padding:6px 14px;border-radius:3px;font-family:\'Rajdhani\',sans-serif;font-size:12px;text-decoration:none;display:inline-block}.tab-nav{position:relative;z-index:10;display:flex;background:rgba(6,11,24,.95);border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto}.tab-btn{padding:11px 22px;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#3a5570;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;font-family:\'Rajdhani\',sans-serif}.tab-btn:hover{color:#0090cc}.tab-btn.active{color:var(--c);border-bottom-color:var(--c)}.tab-body{display:none;padding:20px 24px;position:relative;z-index:2;max-width:980px;margin:0 auto}.tab-body.active{display:block}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:680px){.two-col{grid-template-columns:1fr}}.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;margin-bottom:16px;overflow:hidden;position:relative}.panel::before{content:\'\';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--c),transparent);opacity:.3}.panel-title{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#3a7090;padding:10px 16px 8px;border-bottom:1px solid rgba(0,212,255,.08)}.panel-body{padding:14px 16px}.panel-body h1,.panel-body h2,.panel-body h3{color:var(--c);margin:14px 0 6px;letter-spacing:.5px}.panel-body h1{font-size:17px}.panel-body h2{font-size:15px}.panel-body h3{font-size:14px;color:#8ab0c8}.panel-body p,.panel-body div{margin-bottom:8px;font-size:13px;line-height:1.65}.panel-body ul{margin:6px 0 10px 22px;list-style:disc}.panel-body li{margin-bottom:4px;font-size:13px;line-height:1.5}.panel-body strong{color:var(--y)}.panel-body em{color:#a78bfa}.panel-body blockquote{border-left:3px solid rgba(0,212,255,.4);padding:6px 14px;margin:8px 0;color:#8ab0c8;font-size:13px;background:rgba(0,212,255,.03);border-radius:0 3px 3px 0}.panel-body table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}.panel-body th{background:rgba(0,212,255,.06);padding:7px 10px;text-align:left;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#2a6080;border-bottom:1px solid rgba(0,212,255,.1)}.panel-body td{padding:6px 10px;border-bottom:1px solid rgba(0,212,255,.05);font-size:13px}.panel-body tr:hover td{background:rgba(0,212,255,.03)}.panel-body hr{border:none;border-top:1px solid rgba(0,212,255,.1);margin:14px 0}.copy-block{background:#070e1c;border:1px solid rgba(0,255,157,.2);border-radius:3px;margin:12px 0}.copy-hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid rgba(0,255,157,.1)}.copy-hdr span{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#2a7060}.copy-btn{background:rgba(0,255,157,.1);border:1px solid rgba(0,255,157,.3);color:var(--g);padding:5px 14px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}.copy-btn:hover{background:rgba(0,255,157,.2)}.copy-msg{padding:14px;font-size:13px;color:#8ab8a8;line-height:1.7;white-space:pre-wrap;font-family:\'Rajdhani\',sans-serif}.tier-banner{padding:10px 16px;margin-bottom:16px;border-radius:3px;font-size:13px;font-weight:600;letter-spacing:.5px}.tier-full{background:rgba(0,255,157,.07);border:1px solid rgba(0,255,157,.25);color:var(--g)}.tier-std{background:rgba(245,196,0,.07);border:1px solid rgba(245,196,0,.2);color:var(--y)}';
+  // ── CSS
+  const css='*{box-sizing:border-box;margin:0;padding:0}:root{--c:#00d4ff;--g:#00ff9d;--y:#f5c400;--bg:#060b18;--panel:#0d1528;--border:rgba(0,212,255,.2)}body{font-family:\'Rajdhani\',sans-serif;background:var(--bg);color:#c8d8e8;min-height:100vh}body::before{content:\'\';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}a{color:var(--c);text-decoration:none}.hdr{position:relative;z-index:10;background:linear-gradient(180deg,rgba(0,20,50,.98),rgba(6,11,24,.95));border-bottom:1px solid var(--border);padding:14px 24px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.hdr-left{flex:1;min-width:0}.hdr-title{font-size:22px;font-weight:700;letter-spacing:2px;color:var(--c);text-shadow:0 0 12px rgba(0,212,255,.6);margin-bottom:6px}.hdr-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.hdr-contact{font-size:13px;color:#4a7090;display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px}.hdr-owner{font-size:12px;color:#3a6080;margin-bottom:2px}.hdr-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0}.btn-demo{background:linear-gradient(90deg,rgba(0,255,157,.15),rgba(0,212,255,.1));border:1px solid rgba(0,255,157,.4);color:var(--g);padding:9px 18px;border-radius:3px;font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-decoration:none;display:inline-block}.btn-site{background:rgba(245,196,0,.06);border:1px solid rgba(245,196,0,.3);color:#c8a840;padding:7px 14px;border-radius:3px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;text-decoration:none;display:inline-block}.tab-nav{position:relative;z-index:10;display:flex;background:rgba(6,11,24,.95);border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto}.tab-btn{padding:11px 22px;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#3a5570;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;font-family:\'Rajdhani\',sans-serif}.tab-btn:hover{color:#0090cc}.tab-btn.active{color:var(--c);border-bottom-color:var(--c)}.tab-body{display:none;padding:20px 24px;position:relative;z-index:2;max-width:980px;margin:0 auto}.tab-body.active{display:block}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:680px){.two-col{grid-template-columns:1fr}}.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;margin-bottom:16px;overflow:hidden;position:relative}.panel::before{content:\'\';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--c),transparent);opacity:.3}.panel-title{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#3a7090;padding:10px 16px 8px;border-bottom:1px solid rgba(0,212,255,.08)}.panel-body{padding:14px 16px}.panel-body h1,.panel-body h2,.panel-body h3{color:var(--c);margin:14px 0 6px;letter-spacing:.5px}.panel-body h1{font-size:17px}.panel-body h2{font-size:15px}.panel-body h3{font-size:14px;color:#8ab0c8}.panel-body p{margin-bottom:8px;font-size:13px;line-height:1.65}.panel-body ul{margin:6px 0 10px 22px;list-style:disc}.panel-body li{margin-bottom:4px;font-size:13px;line-height:1.5}.panel-body strong{color:var(--y)}.panel-body em{color:#a78bfa}.panel-body blockquote{border-left:3px solid rgba(0,212,255,.4);padding:6px 14px;margin:8px 0;color:#8ab0c8;font-size:13px;background:rgba(0,212,255,.03);border-radius:0 3px 3px 0}.panel-body table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}.panel-body th{background:rgba(0,212,255,.06);padding:7px 10px;text-align:left;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#2a6080;border-bottom:1px solid rgba(0,212,255,.1)}.panel-body td{padding:6px 10px;border-bottom:1px solid rgba(0,212,255,.05);font-size:13px}.panel-body tr:hover td{background:rgba(0,212,255,.03)}.panel-body hr{border:none;border-top:1px solid rgba(0,212,255,.1);margin:14px 0}.copy-block{background:#070e1c;border:1px solid rgba(0,255,157,.2);border-radius:3px;margin:12px 0}.copy-hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid rgba(0,255,157,.1)}.copy-hdr span{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#2a7060}.copy-btn{background:rgba(0,255,157,.1);border:1px solid rgba(0,255,157,.3);color:var(--g);padding:5px 14px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}.copy-btn:hover{background:rgba(0,255,157,.2)}.copy-msg{padding:14px;font-size:13px;color:#8ab8a8;line-height:1.7;white-space:pre-wrap;font-family:\'Rajdhani\',sans-serif}.tier-banner{padding:10px 16px;margin-bottom:16px;border-radius:3px;font-size:13px;font-weight:600;letter-spacing:.5px}.tier-full{background:rgba(0,255,157,.07);border:1px solid rgba(0,255,157,.25);color:var(--g)}.tier-std{background:rgba(245,196,0,.07);border:1px solid rgba(245,196,0,.2);color:var(--y)}.otabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}.otab-btn{background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.15);color:#3a6080;padding:7px 16px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:.5px;transition:all .15s}.otab-btn:hover{color:#0090cc;border-color:rgba(0,212,255,.3)}.otab-btn.active{background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.5);color:var(--c)}.otab-pane{display:none}.otab-pane.active{display:block}.send-note{background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.12);border-radius:3px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#4a8090;line-height:1.6}';
+  // ── Build portal HTML
   const portalHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>'+esc(biz)+' &#x2014; Sales Portal</title>'
     +'<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>'
     +'<style>'+css+'</style></head><body>'
-    +'<div class="hdr"><div>'
+    +'<div class="hdr"><div class="hdr-left">'
     +'<div class="hdr-title">'+esc(biz)+'</div>'
     +'<div class="hdr-meta"><span style="background:rgba(0,212,255,.08);color:#4a9090;border:1px solid rgba(0,212,255,.2);padding:2px 9px;border-radius:2px;font-size:11px;letter-spacing:1px">'+esc(p.trade)+'</span>'
     +' <span style="font-size:13px;color:#f5c400">&#9733; '+esc(String(p.rating||''))+' <span style="color:#3a6080">('+esc(String(p.reviews||''))+' reviews)</span></span>'
     +' '+stageBadge+' '+intelBadge+'</div>'
-    +'<div class="hdr-contact">'+(p.phone?'<span>&#x1F4DE; <a href="tel:'+p.phone.replace(/\D/g,'')+'" style="color:#00ff9d;font-weight:600">'+esc(p.phone)+'</a></span>':'')+' '+(p.address?'<span>&#x1F4CD; <a href="'+p.maps_url+'" target="_blank" style="color:#6aaa9a">'+esc(p.address)+'</a></span>':'')+' '+(p.zip_income?'<span>&#x1F4B0; Per Capita Income: <span style="color:#00ff9d;font-weight:600">'+esc(p.zip_income)+'</span></span>':'')+'</div>'
-    +'</div><div class="hdr-actions">'+(p.demo_url?'<a href="'+p.demo_url+'" target="_blank" class="btn-demo">&#x1F310; View Demo Site &#x2197;</a>':'')+' '+(p.website?'<a href="'+p.website+'" target="_blank" class="btn-site">&#x1F517; Current Site &#x2197;</a>':'')+'</div></div>'
+    +'<div class="hdr-contact">'
+    +(p.phone?'<span>&#x1F4DE; <a href="tel:'+p.phone.replace(/\D/g,'')+'" style="color:#00ff9d;font-weight:600">'+esc(p.phone)+'</a></span>':'')
+    +(p.email&&p.email!='N/A'&&p.email!='n/a'?'<span>&#x2709;&#xFE0F; <a href="mailto:'+p.email+'" style="color:#00d4ff">'+esc(p.email)+'</a></span>':'')
+    +(p.address?'<span>&#x1F4CD; <a href="'+p.maps_url+'" target="_blank" style="color:#6aaa9a">'+esc(p.address)+'</a></span>':'')
+    +(p.zip_income?'<span>&#x1F4B0; Area Income: <span style="color:#00ff9d;font-weight:600">'+esc(p.zip_income)+'</span></span>':'')
+    +'</div>'
+    +(p.owner?'<div class="hdr-owner">&#x1F464; Owner: <span style="color:#9ab8c8">'+esc(p.owner)+'</span></div>':'')
+    +'</div><div class="hdr-actions">'
+    +(p.demo_url?'<a href="'+p.demo_url+'" target="_blank" class="btn-demo">&#x1F310; Our Demo Site &#x2197;</a>':'')
+    +(p.website?'<a href="'+p.website+'" target="_blank" class="btn-site">&#x1F517; Current Prospect Website &#x2197;</a>':'')
+    +'</div></div>'
     +'<div class="tab-nav">'
     +'<button class="tab-btn active" onclick="showTab(this,\'overview\')">&#x1F4CB; Overview</button>'
     +'<button class="tab-btn" onclick="showTab(this,\'outreach\')">&#x1F4E8; Outreach</button>'
     +'<button class="tab-btn" onclick="showTab(this,\'intel\')">&#x1F50D; Intel</button>'
     +'<button class="tab-btn" onclick="showTab(this,\'strategy\')">&#x26A1; Strategy</button>'
     +'</div>'
-    +'<div id="tab-overview" class="tab-body active"><div class="two-col">'
+    // Overview tab
+    +'<div id="tab-overview" class="tab-body active">'
+    +'<div class="panel" style="border-color:rgba(0,255,157,.3)"><div class="panel-title" style="color:#00ff9d">&#x1F4B5; Avg Job Values &#x2014; Cost of a Lost Customer</div><div class="panel-body">'+roiHtml+'</div></div>'
+    +'<div class="two-col">'
     +'<div class="panel"><div class="panel-title">Business Snapshot</div><div class="panel-body">'+snapHtml+'</div></div>'
     +'<div class="panel"><div class="panel-title">Market Context</div><div class="panel-body">'+mktHtml+'</div></div>'
     +'</div></div>'
+    // Outreach tab
     +'<div id="tab-outreach" class="tab-body">'
-    +'<div class="panel"><div class="panel-title">Pre-Call Demo Drop</div><div class="panel-body">'+copyBlock+callBridgeHtml+'</div></div>'
     +'<div class="panel"><div class="panel-title">Notes &amp; Best Call Times</div><div class="panel-body">'+notesHtml+'</div></div>'
+    +'<div class="panel"><div class="panel-title">Pre-Call Demo Drop</div><div class="panel-body">'
+    +(sendTiming?'<div class="send-note">'+esc(sendTiming).replace(/\n/g,'<br>')+'</div>':'')
+    +'<div class="otabs">'
+    +(preCallMsg?'<button class="otab-btn active" onclick="showOTab(this,\'precall\')">&#x1F4AC; Pre-Call Message</button>':'')
+    +(callBridgeRaw?'<button class="otab-btn'+(preCallMsg?'':' active')+'" onclick="showOTab(this,\'bridge\')">&#x260E;&#xFE0F; Call Bridge</button>':'')
+    +(coldOpenRaw?'<button class="otab-btn'+(preCallMsg||callBridgeRaw?'':' active')+'" onclick="showOTab(this,\'cold\')">&#x2744;&#xFE0F; Cold Open</button>':'')
     +'</div>'
+    +(preCallMsg?'<div class="otab-pane active" id="otab-precall"><div class="copy-block"><div class="copy-hdr"><span>Send via contact form / DM (24&#x2013;48h before call)</span><button class="copy-btn" id="cpbtn1" onclick="doCopy(\'cpbtn1\',\'ctxt1\')">&#x1F4CB; Copy</button></div><div class="copy-msg" id="ctxt1">'+esc(preCallMsg)+'</div></div></div>':'')
+    +(callBridgeRaw?'<div class="otab-pane'+(preCallMsg?'':' active')+'" id="otab-bridge"><div class="copy-block"><div class="copy-hdr"><span>On-call bridge (after they saw the demo)</span><button class="copy-btn" id="cpbtn2" onclick="doCopy(\'cpbtn2\',\'ctxt2\')">&#x1F4CB; Copy</button></div><div class="copy-msg" id="ctxt2">'+esc(callBridgeRaw)+'</div></div></div>':'')
+    +(coldOpenRaw?'<div class="otab-pane'+(preCallMsg||callBridgeRaw?'':' active')+'" id="otab-cold"><div class="copy-block"><div class="copy-hdr"><span>Cold open (no pre-call drop sent)</span><button class="copy-btn" id="cpbtn3" onclick="doCopy(\'cpbtn3\',\'ctxt3\')">&#x1F4CB; Copy</button></div><div class="copy-msg" id="ctxt3">'+esc(coldOpenRaw)+'</div></div></div>':'')
+    +'</div></div>'
+    +'</div>'
+    // Intel tab
     +'<div id="tab-intel" class="tab-body">'+intelTabContent+'</div>'
+    // Strategy tab
     +'<div id="tab-strategy" class="tab-body">'
     +'<div class="panel"><div class="panel-title">Call Script</div><div class="panel-body">'+callScriptHtml+'</div></div>'
-    +stratVcall
-    +'<div class="panel"><div class="panel-title">Cost of a Lost Customer</div><div class="panel-body">'+roiHtml+'</div></div>'
+    +'<div class="panel"><div class="panel-title">'+vcallTitle+'</div><div class="panel-body">'+vcallHtml+'</div></div>'
     +'<div class="panel"><div class="panel-title">Objection Handling</div><div class="panel-body">'+briefObjHtml+'</div></div>'
+    +(tradeCallHtml?'<div class="panel"><div class="panel-title">Trade Call Line &#x2014; '+esc(p.trade)+'</div><div class="panel-body">'+tradeCallHtml+'</div></div>':'')
     +'<div class="panel"><div class="panel-title">Top 10 Angles &#x2014; Why a Website Matters</div><div class="panel-body">'+anglesHtml+'</div></div>'
-    +'<div class="panel"><div class="panel-title">Trade-Specific Call Lines</div><div class="panel-body">'+tradeLinesHtml+'</div></div>'
     +'</div>'
-    +'<script>function showTab(btn,id){document.querySelectorAll(".tab-body").forEach(function(t){t.classList.remove("active")});document.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active")});document.getElementById("tab-"+id).classList.add("active");btn.classList.add("active");}function doCopy(){var t=document.getElementById("copytxt").innerText;if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){var b=document.getElementById("cpbtn");b.textContent="Copied!";setTimeout(function(){b.textContent="Copy"},2000)});}else{var r=document.createRange();r.selectNodeContents(document.getElementById("copytxt"));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand("copy");}}<\/script>'
+    +'<script>function showTab(btn,id){document.querySelectorAll(".tab-body").forEach(function(t){t.classList.remove("active")});document.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active")});document.getElementById("tab-"+id).classList.add("active");btn.classList.add("active");}function showOTab(btn,id){document.querySelectorAll(".otab-pane").forEach(function(p){p.classList.remove("active")});document.querySelectorAll(".otab-btn").forEach(function(b){b.classList.remove("active")});var el=document.getElementById("otab-"+id);if(el)el.classList.add("active");btn.classList.add("active");}function doCopy(btnId,txtId){var t=document.getElementById(txtId).innerText;if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){var b=document.getElementById(btnId);b.textContent="Copied!";setTimeout(function(){b.textContent="📋 Copy";},2000);});}else{var r=document.createRange();r.selectNodeContents(document.getElementById(txtId));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand("copy");}}<\/script>'
     +'</body></html>';
   const w=window.open('','_blank');
   w.document.write(portalHtml);
   w.document.close();
 }
+
 function linkCell(url,label){
   if(!url||url==='—'||url==='') return '<span style="color:#2a4060">—</span>';
   return '<a href="'+url+'" target="_blank" style="color:#00d4ff;font-size:11px">'+label+' ↗</a>';
