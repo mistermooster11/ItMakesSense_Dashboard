@@ -5,7 +5,7 @@ import openpyxl, json, os, datetime, re, random, urllib.parse
 from collections import Counter
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EXCEL_PATH = os.path.join(BASE_DIR, "Leads", "QuickFlip_Master_Leads_UpdatedMay2026.xlsx")
+EXCEL_PATH = os.path.join(BASE_DIR, "QuickFlip_Master_Leads.xlsx")
 BRIEFS_DIR = os.path.join(BASE_DIR, "Sales Briefs")
 OUT_PATH   = os.path.join(BASE_DIR, "Dashboard", "QuickFlip_Dashboard.html")
 
