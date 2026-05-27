@@ -877,55 +877,102 @@ function openBrief(id,biz){
     tbl+='</tbody></table>';
     return rows?tbl:m(auditRaw);
   }
-  // Build Pitch Ammo War Room (shared by both intel and standard paths)
-  function buildWarRoom(painItems,gapItems,aiItems,hooks,reviewItems){
-    const ammoRed='background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-left:4px solid #f87171;border-radius:3px;padding:11px 14px;margin-bottom:8px';
-    const ammoYellow='background:rgba(245,196,0,.07);border:1px solid rgba(245,196,0,.3);border-left:4px solid #f5c400;border-radius:3px;padding:11px 14px;margin-bottom:8px';
-    const ammoPurple='background:rgba(192,132,252,.07);border:1px solid rgba(192,132,252,.3);border-left:4px solid #c084fc;border-radius:3px;padding:11px 14px;margin-bottom:8px';
-    const labelStyle='font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px';
-    const textStyle='font-size:13px;line-height:1.6';
-    let html='<div style="background:linear-gradient(180deg,rgba(248,113,113,.04),rgba(13,21,40,.6));border:2px solid rgba(248,113,113,.2);border-radius:4px;margin-bottom:20px;overflow:hidden">';
-    html+='<div style="background:rgba(248,113,113,.1);padding:10px 18px;border-bottom:1px solid rgba(248,113,113,.2);display:flex;align-items:center;gap:10px">';
-    html+='<span style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#f87171">&#x1F3AF; Pitch Ammo &#x2014; Pain, Gaps &amp; Closes</span>';
-    html+='</div><div style="padding:16px 18px">';
-    // Pain signals
-    painItems.forEach(function(txt){
-      html+='<div style="'+ammoRed+'"><div style="'+labelStyle+';color:#f87171">&#x1F534; PAIN</div><div style="'+textStyle+';color:#e8c8c8">'+esc(txt)+'</div></div>';
-    });
-    // Gaps / bottom lines
-    gapItems.forEach(function(txt){
-      html+='<div style="'+ammoYellow+'"><div style="'+labelStyle+';color:#f5c400">&#x26A1; GAP / BOTTOM LINE</div><div style="'+textStyle+';color:#d4b860">'+esc(txt)+'</div></div>';
-    });
-    // AI visibility weaknesses
-    if(aiItems.length){
-      html+='<div style="'+ammoPurple+'"><div style="'+labelStyle+';color:#c084fc">&#x1F916; AI VISIBILITY GAPS</div>';
-      html+='<div style="'+textStyle+';color:#c8a8e8">'+aiItems.map(function(t){return'&#x2022; '+esc(t);}).join('<br>')+'</div></div>';
+  // ── Solution copy map by pain type ────────────────────────────────────────
+  const SOL={
+    searchVis:'SEO-optimized service pages with local keywords put you in front of homeowners actively searching — not just referrals from people who already know your name. Your reviews and reputation finally show up where buyers are looking.',
+    bookingFriction:'We build a quote request form and click-to-call button into every page — so a visitor who\'s ready to hire can act immediately instead of bouncing to a competitor who makes it easier.',
+    serviceClarity:'Dedicated service pages for each job you do make it immediately clear what you offer and where you work — capturing searches for the specific services homeowners are Googling right now.',
+    emergencyGap:'A prominent emergency line and 24/7 availability badge on every page captures urgent calls — the $500–$1,500 job that otherwise goes to whoever answers first.',
+    competitorAdv:'A fast, mobile-optimized site with structured service pages, trust signals, and real reviews outcompetes directory listings and weak competitors in local search — turning their traffic into yours.',
+    auditVerdict:'A complete rebuild fixes every signal the site is missing — faster load times, mobile-first layout, proper schema markup, clear contact structure, and a service hierarchy search engines can actually read.',
+    aiVisibility:'Schema markup, FAQ content, and structured page architecture gets you appearing in Google AI Overviews and ChatGPT local recommendations — where the next generation of homeowners searches before they ever pick up the phone.'
+  };
+  // Build painSolutions array: [{title, text, color, solution}]
+  function buildPainSolutions(hasIntel,kObs,fAngle,fExpl,cGap,bLine,aiW){
+    const ps=[];
+    if(kObs) ps.push({title:'Search Visibility Gap',text:kObs,color:'red',solution:SOL.searchVis});
+    if(fAngle){
+      const isA=/booking|quote|\bA\b/i.test(fAngle);
+      const isB=/service|clarity|\bB\b/i.test(fAngle);
+      const isC=/emergency|after.hour|\bC\b/i.test(fAngle);
+      const ft=isA?'Booking / Quote Friction':isB?'Service Clarity Gap':isC?'Emergency / After-Hours Gap':'Website Friction';
+      const fs=isA?SOL.bookingFriction:isB?SOL.serviceClarity:isC?SOL.emergencyGap:SOL.bookingFriction;
+      ps.push({title:ft,text:fAngle+(fExpl?' — '+fExpl:''),color:'red',solution:fs});
     }
-    // Hook scripts with copy buttons
-    if(hooks.length){
-      html+='<div style="margin-top:14px;border-top:1px solid rgba(0,212,255,.1);padding-top:14px">';
-      html+='<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#3a7080;margin-bottom:10px">&#x1F4AC; Hook Scripts</div>';
-      hooks.forEach(function(h,i){
-        const btnId="hwbtn"+i;const txtId="hwtxt"+i;
-        html+='<div style="background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.12);border-radius:3px;padding:10px 14px;margin-bottom:8px">';
-        html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">';
-        html+='<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#2a7060;margin-bottom:5px">'+esc(h.label)+'</div>';
-        html+='<button id="'+btnId+'" onclick="doCopy(\''+btnId+'\',\''+txtId+'\')" style="background:rgba(0,255,157,.08);border:1px solid rgba(0,255,157,.25);color:#00ff9d;padding:3px 10px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">&#x1F4CB; Copy</button>';
+    if(cGap) ps.push({title:'Competitor Search Advantage',text:cGap,color:'yellow',solution:SOL.competitorAdv});
+    if(bLine) ps.push({title:'Site Audit Verdict',text:bLine,color:'yellow',solution:SOL.auditVerdict});
+    aiW.forEach(function(w){ps.push({title:'AI Visibility Gap',text:w,color:'purple',solution:SOL.aiVisibility});});
+    return ps;
+  }
+  // Build War Room HTML: pain/solution side-by-side grid + hooks + reviews
+  function buildWarRoom(painSolutions,hooks,reviewItems){
+    const colHead='font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:8px 18px;';
+    let html='<div style="background:linear-gradient(180deg,rgba(248,113,113,.04),rgba(13,21,40,.7));border:2px solid rgba(248,113,113,.2);border-radius:4px;margin-bottom:20px;overflow:hidden">';
+    // Header
+    html+='<div style="background:rgba(248,113,113,.1);padding:11px 18px;border-bottom:1px solid rgba(248,113,113,.2)">';
+    html+='<span style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#f87171">&#x1F3AF; Pitch Ammo &#x2014; Pain &amp; Solution</span>';
+    html+='</div>';
+    if(painSolutions.length){
+      // Column headers
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid rgba(0,212,255,.1)">';
+      html+='<div style="'+colHead+'color:#f87171;background:rgba(248,113,113,.06);border-right:1px solid rgba(0,212,255,.08)">&#x26A0;&#xFE0F; THE PAIN</div>';
+      html+='<div style="'+colHead+'color:#00ff9d;background:rgba(0,255,157,.04)">&#x2705; OUR FIX</div>';
+      html+='</div>';
+      // Each pain/solution row
+      painSolutions.forEach(function(item){
+        const isRed=item.color==='red';
+        const isPurple=item.color==='purple';
+        const dotC=isRed?'#f87171':isPurple?'#c084fc':'#f5c400';
+        const titleC=isRed?'#f87171':isPurple?'#c084fc':'#f5c400';
+        const textC=isRed?'#e8c8c8':isPurple?'#c8a8e8':'#d4b860';
+        const painBg=isRed?'rgba(248,113,113,.05)':isPurple?'rgba(192,132,252,.05)':'rgba(245,196,0,.04)';
+        const borderC=isRed?'rgba(248,113,113,.15)':isPurple?'rgba(192,132,252,.15)':'rgba(245,196,0,.12)';
+        html+='<div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid rgba(0,212,255,.07)">';
+        // LEFT — The Pain
+        html+='<div style="padding:14px 18px;background:'+painBg+';border-right:1px solid '+borderC+'">';
+        html+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">';
+        html+='<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+dotC+';flex-shrink:0"></span>';
+        html+='<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:'+titleC+'">'+esc(item.title)+'</span>';
         html+='</div>';
-        html+='<div id="'+txtId+'" style="font-size:13px;color:#8ab8a8;line-height:1.65;font-style:italic">'+esc(h.text)+'</div></div>';
+        html+='<div style="font-size:13px;color:'+textC+';line-height:1.7">'+esc(item.text)+'</div>';
+        html+='</div>';
+        // RIGHT — Our Fix
+        html+='<div style="padding:14px 18px;background:rgba(0,255,157,.03)">';
+        html+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">';
+        html+='<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#00ff9d;flex-shrink:0"></span>';
+        html+='<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#3a9060">OUR FIX</span>';
+        html+='</div>';
+        html+='<div style="font-size:13px;color:#8ab8a8;line-height:1.7">'+esc(item.solution)+'</div>';
+        html+='</div>';
+        html+='</div>';
+      });
+    }
+    // Hook scripts
+    if(hooks.length){
+      html+='<div style="padding:16px 18px;border-top:1px solid rgba(0,212,255,.1)">';
+      html+='<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3a7080;margin-bottom:12px">&#x1F4AC; Hook Scripts &#x2014; Use These Word-for-Word</div>';
+      hooks.forEach(function(h,i){
+        const btnId='hwbtn'+i;const txtId='hwtxt'+i;
+        html+='<div style="background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.12);border-radius:3px;padding:12px 14px;margin-bottom:10px">';
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">';
+        html+='<span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#2a9070">'+esc(h.label)+'</span>';
+        html+='<button id="'+btnId+'" onclick="doCopy(\''+btnId+'\',\''+txtId+'\')" style="background:rgba(0,255,157,.08);border:1px solid rgba(0,255,157,.25);color:#00ff9d;padding:4px 12px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">&#x1F4CB; Copy</button>';
+        html+='</div>';
+        html+='<div id="'+txtId+'" style="font-size:13px;color:#8ab8a8;line-height:1.7;font-style:italic">'+esc(h.text)+'</div>';
+        html+='</div>';
       });
       html+='</div>';
     }
     // Standout reviews
     if(reviewItems.length){
-      html+='<div style="margin-top:14px;border-top:1px solid rgba(0,212,255,.1);padding-top:14px">';
-      html+='<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#3a7080;margin-bottom:8px">&#x1F4AC; Standout Reviews</div>';
+      html+='<div style="padding:16px 18px;border-top:1px solid rgba(0,212,255,.1)">';
+      html+='<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3a7080;margin-bottom:10px">&#x1F4AC; Standout Reviews</div>';
       reviewItems.forEach(function(r){
-        html+='<div style="border-left:2px solid rgba(0,212,255,.2);padding:4px 10px;margin-bottom:6px;font-size:12px;color:#7ab0b0;font-style:italic;line-height:1.5">&#x201C;'+esc(r)+'&#x201D;</div>';
+        html+='<div style="border-left:2px solid rgba(0,212,255,.2);padding:5px 12px;margin-bottom:7px;font-size:13px;color:#7ab0b0;font-style:italic;line-height:1.6">&#x201C;'+esc(r)+'&#x201D;</div>';
       });
       html+='</div>';
     }
-    html+='</div></div>';
+    html+='</div>';
     return html;
   }
   let intelTabContent='';
@@ -937,29 +984,21 @@ function openBrief(id,biz){
     const bottomLine=bottomLineM?bottomLineM[1].trim():'';
     const auditTable=buildAuditTable(auditRaw);
     const aiFullHtml=m(aiRawFull);
-    // Assemble pain / gap / ai items
-    const painItems=[keyObs,frictionAngle].filter(Boolean);
-    const gapItems=[compGap,bottomLine].filter(Boolean);
-    const warRoomHtml=buildWarRoom(painItems,gapItems,aiWeaknesses,pitchHooks,reviews);
+    const painSols=buildPainSolutions(true,keyObs,frictionAngle,frictionExpl,compGap,bottomLine,aiWeaknesses);
+    const warRoomHtml=buildWarRoom(painSols,pitchHooks,reviews);
     intelTabContent=
        '<div class="tier-full tier-banner">&#x1F7E2; Full Intel &#x2014; Tier 2</div>'
       +warRoomHtml
-      // 1. Job Values
       +'<div class="panel"><div class="panel-title">&#x1F4B5; What These Jobs Pay</div><div class="panel-body">'+roiHtml+'</div></div>'
-      // 2. AI Visibility full
       +(aiFullHtml?'<div class="panel"><div class="panel-title">&#x1F916; AI Visibility Assessment</div><div class="panel-body">'+aiFullHtml+'</div></div>':'')
-      // 3. Competitive detail
       +'<div class="panel"><div class="panel-title">Top Competitors</div><div class="panel-body">'+m(compRaw)+'</div></div>'
-      // 4. Market Context
       +'<div class="panel"><div class="panel-title">Market Context</div><div class="panel-body">'+mktHtml+'</div></div>'
-      // 5. Site Audit
       +'<div class="panel"><div class="panel-title">Current Site Audit</div><div class="panel-body">'+auditTable
       +(bottomLine?'<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.25);border-left:3px solid #f87171;border-radius:2px;padding:10px 14px;margin-top:14px"><span style="font-size:11px;font-weight:700;letter-spacing:1px;color:#f87171;text-transform:uppercase">Bottom Line: </span><span style="font-size:13px;color:#c8a8a8">'+esc(bottomLine)+'</span></div>':'')
       +'</div></div>';
   }else{
-    const painItems=[frictionAngle].filter(Boolean);
-    const gapItems=[compGap].filter(Boolean);
-    const warRoomHtml=buildWarRoom(painItems,gapItems,[],pitchHooks,reviews);
+    const painSols=buildPainSolutions(false,'',frictionAngle,frictionExpl,compGap,'',[]);
+    const warRoomHtml=buildWarRoom(painSols,pitchHooks,reviews);
     intelTabContent=
        '<div class="tier-std tier-banner">&#x1F7E1; Standard Brief &#x2014; Run /lead-intel to unlock full intel.</div>'
       +warRoomHtml
