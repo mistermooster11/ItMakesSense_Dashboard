@@ -834,7 +834,13 @@ function openBrief(id,biz){
   const keyObsBCM=serpRawBC?serpRawBC.match(/\*\*Key observation:\*\*([\s\S]*?)(?:\n\n|$)/):'';
   const keyObs=keyObsBCM?keyObsBCM[1].trim():'';
   const aiRawFull=p.has_intel?sec(p.intel,'AI VISIBILITY'):'';
-  const aiWeaknesses=p.has_intel?[...aiRawFull.matchAll(/- \[ \]\s*(.*)/g)].map(function(mm){return mm[1].trim();}).filter(Boolean):[];
+  // [x] = confirmed cons (why not cited); [ ] = already solved by QuickFlip — we want [x] only
+  const aiConItems=p.has_intel?[...aiRawFull.matchAll(/- \[x\]\s*(.*)/gi)].map(function(mm){return mm[1].replace(/—\s*✅.*$/,'').trim();}).filter(Boolean):[];
+  // Also grab the "The opportunity:" paragraph as a closing line
+  const aiOppM=aiRawFull?aiRawFull.match(/\*\*The opportunity[^*]*\*\*[:\s]*([\s\S]*?)(?:\n\n|$)/i):null;
+  const aiOpp=aiOppM?aiOppM[1].trim():'';
+  // Build one consolidated AI weakness string for the War Room
+  const aiWeaknesses=aiConItems.length?[aiConItems.map(function(c,i){return (i+1)+'. '+c;}).join('\n')+(aiOpp?'\n\n'+aiOpp:'')]:[];
   // ── OUTREACH data ──────────────────────────────────────────────────────────
   const notesHtml=m(sec(p.brief,'NOTES'));
   const timingM=step0Raw.match(/^([\s\S]*?)(?=\n---)/);
