@@ -242,13 +242,17 @@ kpis = {"total":total,"yes":yes_count,"maybe":maybe_count,"no":no_count,
         "pitch_ready":pitch_ready,"in_dev":in_dev,"pending_dev":pending_dev,
         "clients_won":0,"trade_counts_yes":trade_counts_yes}
 
-data_js = f"""const LEADS={json.dumps(leads_clean,ensure_ascii=False)};
-const DEV_ROWS={json.dumps(dev_clean,ensure_ascii=False)};
-const CAMPAIGN_LOG={json.dumps(campaign_clean,ensure_ascii=False)};
-const KPIS={json.dumps(kpis,ensure_ascii=False)};
-const SALES_PORTALS={json.dumps(sales_portals,ensure_ascii=False)};
-const PLAYBOOK={json.dumps(playbook,ensure_ascii=False)};
-const TRADE_REF={json.dumps(trade_ref,ensure_ascii=False)};
+def jdump(obj):
+    """JSON-encode and escape </ so embedded markdown can't break the script tag."""
+    return json.dumps(obj, ensure_ascii=False).replace('</', '<\\/')
+
+data_js = f"""const LEADS={jdump(leads_clean)};
+const DEV_ROWS={jdump(dev_clean)};
+const CAMPAIGN_LOG={jdump(campaign_clean)};
+const KPIS={jdump(kpis)};
+const SALES_PORTALS={jdump(sales_portals)};
+const PLAYBOOK={jdump(playbook)};
+const TRADE_REF={jdump(trade_ref)};
 const REFRESHED="{datetime.date.today()}";
 """
 
