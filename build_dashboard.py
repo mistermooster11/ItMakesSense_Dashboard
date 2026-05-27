@@ -826,10 +826,15 @@ function openBrief(id,biz){
   const bigJobRows=roiLines.filter(function(l){return!l.includes('missed jobs')&&!l.includes('3 missed');}).slice(0,4);
   const roiHtml=m(roiRaw);
   const mktHtml=m(sec(p.brief,'MARKET CONTEXT'));
-  // Key observation from intel (for Battle Card pain point)
+  // "The gap" text from brief competitive landscape
+  const compGapM=compLandRaw.match(/\*\*The gap:\*\*([\s\S]*?)(?:\n\n|$)/i);
+  const compGap=compGapM?compGapM[1].trim():'';
+  // Key observation + AI weaknesses from intel
   const serpRawBC=p.has_intel?sec(p.intel,'KEYWORD DEMAND'):'';
   const keyObsBCM=serpRawBC?serpRawBC.match(/\*\*Key observation:\*\*([\s\S]*?)(?:\n\n|$)/):'';
   const keyObs=keyObsBCM?keyObsBCM[1].trim():'';
+  const aiRawFull=p.has_intel?sec(p.intel,'AI VISIBILITY'):'';
+  const aiWeaknesses=p.has_intel?[...aiRawFull.matchAll(/- \[ \]\s*(.*)/g)].map(function(mm){return mm[1].trim();}).filter(Boolean):[];
   // ── OUTREACH data ──────────────────────────────────────────────────────────
   const notesHtml=m(sec(p.brief,'NOTES'));
   const timingM=step0Raw.match(/^([\s\S]*?)(?=\n---)/);
@@ -847,23 +852,14 @@ function openBrief(id,biz){
   const pitchHooks=hookRx.slice(0,3).map(function(hm){return{label:hm[1].trim(),text:hm[2].trim()};});
   const anglesHtml=m(sec(PLAYBOOK,'PART 1'));
   // ── INTEL tab ──────────────────────────────────────────────────────────────
-  let intelTabContent='';
-  const intelTopPanels='<div class="two-col">'
-    +'<div class="panel"><div class="panel-title">Market Context</div><div class="panel-body">'+mktHtml+'</div></div>'
-    +'<div class="panel"><div class="panel-title">&#x1F4B5; Avg Job Values</div><div class="panel-body">'+roiHtml+'</div></div>'
-    +'</div>';
-  if(p.has_intel){
-    const serpRaw=sec(p.intel,'KEYWORD DEMAND');
-    const compRaw=sec(p.intel,"WHO'S WINNING");
-    const auditRaw=sec(p.intel,'SITE AUDIT')||sec(p.intel,'CURRENT SITE');
-    const bottomLineM=auditRaw.match(/\*\*Bottom line:\*\*([\s\S]*?)(?:\n\n|$)/);
-    const bottomLine=bottomLineM?bottomLineM[1].trim():'';
-    let auditTable='<table style="width:100%;border-collapse:collapse"><thead><tr>'
+  // Build audit table helper (reused below)
+  function buildAuditTable(auditRaw){
+    let tbl='<table style="width:100%;border-collapse:collapse"><thead><tr>'
       +'<th style="text-align:left;padding:7px 10px;font-size:11px;letter-spacing:1px;color:#2a6080;border-bottom:1px solid rgba(0,212,255,.12);background:rgba(0,212,255,.04)">Signal</th>'
       +'<th style="text-align:left;padding:7px 10px;font-size:11px;letter-spacing:1px;color:#2a6080;border-bottom:1px solid rgba(0,212,255,.12);background:rgba(0,212,255,.04)">Status</th>'
       +'<th style="text-align:left;padding:7px 10px;font-size:11px;letter-spacing:1px;color:#2a6080;border-bottom:1px solid rgba(0,212,255,.12);background:rgba(0,212,255,.04)">Notes</th>'
       +'</tr></thead><tbody>';
-    let auditRows=0;
+    let rows=0;
     auditRaw.split('\n').forEach(function(l){
       if(!l.startsWith('|')||l.includes('---'))return;
       const cells=l.split('|').map(function(c){return c.trim();}).filter(function(c){return c;});
@@ -873,28 +869,103 @@ function openBrief(id,biz){
       if(st.includes('❌'))stHtml='<span style="background:rgba(248,113,113,.12);color:#f87171;padding:2px 8px;border-radius:2px;font-weight:700;font-size:12px">❌ Missing</span>';
       else if(st.includes('✅'))stHtml='<span style="background:rgba(0,255,157,.1);color:#00ff9d;padding:2px 8px;border-radius:2px;font-weight:700;font-size:12px">✅ Present</span>';
       else if(st.includes('⚠'))stHtml='<span style="background:rgba(245,196,0,.1);color:#f5c400;padding:2px 8px;border-radius:2px;font-weight:700;font-size:12px">⚠️ Partial</span>';
-      auditTable+='<tr><td style="padding:7px 10px;border-bottom:1px solid rgba(0,212,255,.05);font-size:13px;font-weight:600;color:#c8d8e8">'+esc(sig)+'</td>'
+      tbl+='<tr><td style="padding:7px 10px;border-bottom:1px solid rgba(0,212,255,.05);font-size:13px;font-weight:600;color:#c8d8e8">'+esc(sig)+'</td>'
         +'<td style="padding:7px 10px;border-bottom:1px solid rgba(0,212,255,.05);white-space:nowrap">'+stHtml+'</td>'
         +'<td style="padding:7px 10px;border-bottom:1px solid rgba(0,212,255,.05);font-size:12px;color:#6a90a8">'+esc(notes)+'</td></tr>';
-      auditRows++;
+      rows++;
     });
-    auditTable+='</tbody></table>';
-    if(!auditRows)auditTable=m(auditRaw);
-    const aiHtml=m(sec(p.intel,'AI VISIBILITY'));
-    intelTabContent=intelTopPanels
-      +'<div class="tier-full tier-banner">&#x1F7E2; Full Intel &#x2014; Tier 2. Walk through this on the video call.</div>'
-      +(keyObs?'<div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-left:4px solid #f87171;border-radius:3px;padding:14px 16px;margin-bottom:16px">'
-        +'<div style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#f87171;text-transform:uppercase;margin-bottom:6px">&#x26A0;&#xFE0F; Pain Point &#x2014; Key Observation</div>'
-        +'<div style="font-size:14px;color:#e8c8c8;line-height:1.65">'+esc(keyObs)+'</div></div>':'')
+    tbl+='</tbody></table>';
+    return rows?tbl:m(auditRaw);
+  }
+  // Build Pitch Ammo War Room (shared by both intel and standard paths)
+  function buildWarRoom(painItems,gapItems,aiItems,hooks,reviewItems){
+    const ammoRed='background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-left:4px solid #f87171;border-radius:3px;padding:11px 14px;margin-bottom:8px';
+    const ammoYellow='background:rgba(245,196,0,.07);border:1px solid rgba(245,196,0,.3);border-left:4px solid #f5c400;border-radius:3px;padding:11px 14px;margin-bottom:8px';
+    const ammoPurple='background:rgba(192,132,252,.07);border:1px solid rgba(192,132,252,.3);border-left:4px solid #c084fc;border-radius:3px;padding:11px 14px;margin-bottom:8px';
+    const labelStyle='font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px';
+    const textStyle='font-size:13px;line-height:1.6';
+    let html='<div style="background:linear-gradient(180deg,rgba(248,113,113,.04),rgba(13,21,40,.6));border:2px solid rgba(248,113,113,.2);border-radius:4px;margin-bottom:20px;overflow:hidden">';
+    html+='<div style="background:rgba(248,113,113,.1);padding:10px 18px;border-bottom:1px solid rgba(248,113,113,.2);display:flex;align-items:center;gap:10px">';
+    html+='<span style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#f87171">&#x1F3AF; Pitch Ammo &#x2014; Pain, Gaps &amp; Closes</span>';
+    html+='</div><div style="padding:16px 18px">';
+    // Pain signals
+    painItems.forEach(function(txt){
+      html+='<div style="'+ammoRed+'"><div style="'+labelStyle+';color:#f87171">&#x1F534; PAIN</div><div style="'+textStyle+';color:#e8c8c8">'+esc(txt)+'</div></div>';
+    });
+    // Gaps / bottom lines
+    gapItems.forEach(function(txt){
+      html+='<div style="'+ammoYellow+'"><div style="'+labelStyle+';color:#f5c400">&#x26A1; GAP / BOTTOM LINE</div><div style="'+textStyle+';color:#d4b860">'+esc(txt)+'</div></div>';
+    });
+    // AI visibility weaknesses
+    if(aiItems.length){
+      html+='<div style="'+ammoPurple+'"><div style="'+labelStyle+';color:#c084fc">&#x1F916; AI VISIBILITY GAPS</div>';
+      html+='<div style="'+textStyle+';color:#c8a8e8">'+aiItems.map(function(t){return'&#x2022; '+esc(t);}).join('<br>')+'</div></div>';
+    }
+    // Hook scripts with copy buttons
+    if(hooks.length){
+      html+='<div style="margin-top:14px;border-top:1px solid rgba(0,212,255,.1);padding-top:14px">';
+      html+='<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#3a7080;margin-bottom:10px">&#x1F4AC; Hook Scripts</div>';
+      hooks.forEach(function(h,i){
+        const btnId="hwbtn"+i;const txtId="hwtxt"+i;
+        html+='<div style="background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.12);border-radius:3px;padding:10px 14px;margin-bottom:8px">';
+        html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">';
+        html+='<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#2a7060;margin-bottom:5px">'+esc(h.label)+'</div>';
+        html+='<button id="'+btnId+'" onclick="doCopy(\''+btnId+'\',\''+txtId+'\')" style="background:rgba(0,255,157,.08);border:1px solid rgba(0,255,157,.25);color:#00ff9d;padding:3px 10px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">&#x1F4CB; Copy</button>';
+        html+='</div>';
+        html+='<div id="'+txtId+'" style="font-size:13px;color:#8ab8a8;line-height:1.65;font-style:italic">'+esc(h.text)+'</div></div>';
+      });
+      html+='</div>';
+    }
+    // Standout reviews
+    if(reviewItems.length){
+      html+='<div style="margin-top:14px;border-top:1px solid rgba(0,212,255,.1);padding-top:14px">';
+      html+='<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#3a7080;margin-bottom:8px">&#x1F4AC; Standout Reviews</div>';
+      reviewItems.forEach(function(r){
+        html+='<div style="border-left:2px solid rgba(0,212,255,.2);padding:4px 10px;margin-bottom:6px;font-size:12px;color:#7ab0b0;font-style:italic;line-height:1.5">&#x201C;'+esc(r)+'&#x201D;</div>';
+      });
+      html+='</div>';
+    }
+    html+='</div></div>';
+    return html;
+  }
+  let intelTabContent='';
+  if(p.has_intel){
+    const serpRaw=sec(p.intel,'KEYWORD DEMAND');
+    const compRaw=sec(p.intel,"WHO'S WINNING");
+    const auditRaw=sec(p.intel,'SITE AUDIT')||sec(p.intel,'CURRENT SITE');
+    const bottomLineM=auditRaw.match(/\*\*Bottom line:\*\*([\s\S]*?)(?:\n\n|$)/);
+    const bottomLine=bottomLineM?bottomLineM[1].trim():'';
+    const auditTable=buildAuditTable(auditRaw);
+    const aiFullHtml=m(aiRawFull);
+    // Assemble pain / gap / ai items
+    const painItems=[keyObs,frictionAngle].filter(Boolean);
+    const gapItems=[compGap,bottomLine].filter(Boolean);
+    const warRoomHtml=buildWarRoom(painItems,gapItems,aiWeaknesses,pitchHooks,reviews);
+    intelTabContent=
+       '<div class="tier-full tier-banner">&#x1F7E2; Full Intel &#x2014; Tier 2</div>'
+      +warRoomHtml
+      // 1. Job Values
+      +'<div class="panel"><div class="panel-title">&#x1F4B5; What These Jobs Pay</div><div class="panel-body">'+roiHtml+'</div></div>'
+      // 2. AI Visibility full
+      +(aiFullHtml?'<div class="panel"><div class="panel-title">&#x1F916; AI Visibility Assessment</div><div class="panel-body">'+aiFullHtml+'</div></div>':'')
+      // 3. Competitive detail
+      +'<div class="panel"><div class="panel-title">Top Competitors</div><div class="panel-body">'+m(compRaw)+'</div></div>'
+      // 4. Market Context
+      +'<div class="panel"><div class="panel-title">Market Context</div><div class="panel-body">'+mktHtml+'</div></div>'
+      // 5. Site Audit
       +'<div class="panel"><div class="panel-title">Current Site Audit</div><div class="panel-body">'+auditTable
       +(bottomLine?'<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.25);border-left:3px solid #f87171;border-radius:2px;padding:10px 14px;margin-top:14px"><span style="font-size:11px;font-weight:700;letter-spacing:1px;color:#f87171;text-transform:uppercase">Bottom Line: </span><span style="font-size:13px;color:#c8a8a8">'+esc(bottomLine)+'</span></div>':'')
-      +'</div></div>'
-      +'<div class="panel"><div class="panel-title">Top Competitors</div><div class="panel-body">'+m(compRaw)+'</div></div>'
-      +(aiHtml?'<div class="panel"><div class="panel-title">AI Visibility Assessment</div><div class="panel-body">'+aiHtml+'</div></div>':'');
+      +'</div></div>';
   }else{
-    intelTabContent=intelTopPanels
-      +'<div class="tier-std tier-banner">&#x1F7E1; Standard Brief (Tier 1) &#x2014; Run /lead-intel after video call confirmed to unlock full intel.</div>'
-      +'<div class="panel"><div class="panel-title">Competitive Landscape</div><div class="panel-body">'+m(compLandRaw)+'</div></div>';
+    const painItems=[frictionAngle].filter(Boolean);
+    const gapItems=[compGap].filter(Boolean);
+    const warRoomHtml=buildWarRoom(painItems,gapItems,[],pitchHooks,reviews);
+    intelTabContent=
+       '<div class="tier-std tier-banner">&#x1F7E1; Standard Brief &#x2014; Run /lead-intel to unlock full intel.</div>'
+      +warRoomHtml
+      +'<div class="panel"><div class="panel-title">&#x1F4B5; What These Jobs Pay</div><div class="panel-body">'+roiHtml+'</div></div>'
+      +'<div class="panel"><div class="panel-title">Competitive Landscape</div><div class="panel-body">'+m(compLandRaw)+'</div></div>'
+      +'<div class="panel"><div class="panel-title">Market Context</div><div class="panel-body">'+mktHtml+'</div></div>';
   }
   // ── Badges ─────────────────────────────────────────────────────────────────
   const stageBadge=p.dev_stage&&p.dev_stage.includes('Completed')
@@ -965,24 +1036,10 @@ function openBrief(id,biz){
     +'</div>'
     // ── OVERVIEW TAB
     +'<div id="tab-overview" class="tab-body active">'
-    +'<div class="two-col" style="margin-bottom:16px">'
-    // Battle Card
-    +'<div class="panel" style="border-color:rgba(192,132,252,.25)"><div class="panel-title" style="color:#c084fc">&#x26A1; Battle Card</div><div class="panel-body">'
-    +'<div style="margin-bottom:12px"><div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#3a5070;margin-bottom:6px">Top Competitors</div>'
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+compChips+'</div></div>'
-    +(keyObs||frictionAngle?'<div style="margin-bottom:12px"><div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#3a5070;margin-bottom:4px">'+(keyObs?'&#x26A0;&#xFE0F; Key Intel Finding':'Their Biggest Gap')+'</div>'
-      +'<div style="font-size:13px;color:#f5c400;font-weight:600;line-height:1.5">'+esc(keyObs||frictionAngle)+'</div>'
-      +(!keyObs&&frictionExpl?'<div style="font-size:12px;color:#7a9090;margin-top:3px;line-height:1.5">'+esc(frictionExpl)+'</div>':'')
-      +'</div>':'')
-    +(reviewsHtml?'<div><div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#3a5070;margin-bottom:6px">Standout Reviews</div>'+reviewsHtml+'</div>':'')
-    +'</div></div>'
-    // Job Values
-    +'<div class="panel" style="border-color:rgba(0,255,157,.2)"><div class="panel-title" style="color:#00ff9d">&#x1F4B5; What These Jobs Pay</div><div class="panel-body">'
-    +jobValsHtml
-    +'</div></div>'
+    +'<div class="two-col">'
+    +'<div class="panel" style="margin-bottom:0"><div class="panel-title">Business Snapshot</div><div class="panel-body">'+snapHtml+'</div></div>'
+    +'<div class="panel" style="border-color:rgba(0,255,157,.2);margin-bottom:0"><div class="panel-title" style="color:#00ff9d">&#x1F4B5; What These Jobs Pay</div><div class="panel-body">'+jobValsHtml+'</div></div>'
     +'</div>'
-    // Business Snapshot
-    +'<div class="panel"><div class="panel-title">Business Snapshot</div><div class="panel-body">'+snapHtml+'</div></div>'
     +'</div>'
     // ── OUTREACH TAB
     +'<div id="tab-outreach" class="tab-body">'
