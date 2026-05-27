@@ -221,6 +221,7 @@ for lead in all_leads:
         'has_intel': phone_raw in intel_map,
         'owner':     brief_meta.get('Owner', ''),
         'email':     brief_meta.get('Email', ''),
+        'website_brief': norm_url(brief_meta.get('Website', '')),
     }
 
 leads_clean    = [clean(r) for r in all_leads]
@@ -833,6 +834,10 @@ function openBrief(id,biz){
   const bigJobRows=roiLines.filter(function(l){return!l.includes('missed jobs')&&!l.includes('3 missed');}).slice(0,4);
   const roiHtml=m(roiRaw);
   const mktHtml=m(sec(p.brief,'MARKET CONTEXT'));
+  // Key observation from intel (for Battle Card pain point)
+  const serpRawBC=p.has_intel?sec(p.intel,'KEYWORD DEMAND'):'';
+  const keyObsBCM=serpRawBC?serpRawBC.match(/\*\*Key observation:\*\*([\s\S]*?)(?:\n\n|$)/):'';
+  const keyObs=keyObsBCM?keyObsBCM[1].trim():'';
   // ── OUTREACH data ──────────────────────────────────────────────────────────
   const notesHtml=m(sec(p.brief,'NOTES'));
   const timingM=step0Raw.match(/^([\s\S]*?)(?=\n---)/);
@@ -857,8 +862,6 @@ function openBrief(id,biz){
     +'</div>';
   if(p.has_intel){
     const serpRaw=sec(p.intel,'KEYWORD DEMAND');
-    const keyObsM=serpRaw.match(/\*\*Key observation:\*\*([\s\S]*?)(?:\n\n|$)/);
-    const keyObs=keyObsM?keyObsM[1].trim():'';
     const compRaw=sec(p.intel,"WHO'S WINNING");
     const auditRaw=sec(p.intel,'SITE AUDIT')||sec(p.intel,'CURRENT SITE');
     const bottomLineM=auditRaw.match(/\*\*Bottom line:\*\*([\s\S]*?)(?:\n\n|$)/);
@@ -941,6 +944,7 @@ function openBrief(id,biz){
     return'<div class="hook-card"><div class="hook-label">'+esc(h.label)+'</div><div class="hook-text">'+esc(h.text)+'</div></div>';
   }).join(''):'<div style="font-size:11px;color:#2a4060">No prospect hooks found — check the brief\'s Call Script section.</div>';
   // ── Build portal HTML ──────────────────────────────────────────────────────
+  const csEsc=(typeof CALL_SCRIPT_HTML!=='undefined'&&CALL_SCRIPT_HTML)?CALL_SCRIPT_HTML.replace(/"/g,'&quot;'):'';
   const portalHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>'+esc(biz)+' &#x2014; Sales Portal</title>'
     +'<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>'
     +'<style>'+css+'</style></head><body>'
@@ -959,7 +963,7 @@ function openBrief(id,biz){
     +(p.owner?'<div class="hdr-owner">&#x1F464; Owner: <span style="color:#9ab8c8">'+esc(p.owner)+'</span></div>':'')
     +'</div><div class="hdr-actions">'
     +(p.demo_url?'<a href="'+p.demo_url+'" target="_blank" class="btn-demo">&#x1F310; Our Demo Site &#x2197;</a>':'')
-    +(p.website?'<a href="'+p.website+'" target="_blank" class="btn-site">&#x1F517; Current Prospect Website &#x2197;</a>':'')
+    +((p.website_brief||p.website)?'<a href="'+(p.website_brief||p.website)+'" target="_blank" class="btn-site">&#x1F517; Current Prospect Website &#x2197;</a>':'')
     +'</div></div>'
     // Tab nav
     +'<div class="tab-nav">'
@@ -975,9 +979,9 @@ function openBrief(id,biz){
     +'<div class="panel" style="border-color:rgba(192,132,252,.25)"><div class="panel-title" style="color:#c084fc">&#x26A1; Battle Card</div><div class="panel-body">'
     +'<div style="margin-bottom:12px"><div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#3a5070;margin-bottom:6px">Top Competitors</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+compChips+'</div></div>'
-    +(frictionAngle?'<div style="margin-bottom:12px"><div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#3a5070;margin-bottom:4px">Their Biggest Gap</div>'
-      +'<div style="font-size:13px;color:#f5c400;font-weight:600">'+esc(frictionAngle)+'</div>'
-      +(frictionExpl?'<div style="font-size:12px;color:#7a9090;margin-top:3px;line-height:1.5">'+esc(frictionExpl)+'</div>':'')
+    +(keyObs||frictionAngle?'<div style="margin-bottom:12px"><div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#3a5070;margin-bottom:4px">'+(keyObs?'&#x26A0;&#xFE0F; Key Intel Finding':'Their Biggest Gap')+'</div>'
+      +'<div style="font-size:13px;color:#f5c400;font-weight:600;line-height:1.5">'+esc(keyObs||frictionAngle)+'</div>'
+      +(!keyObs&&frictionExpl?'<div style="font-size:12px;color:#7a9090;margin-top:3px;line-height:1.5">'+esc(frictionExpl)+'</div>':'')
       +'</div>':'')
     +(reviewsHtml?'<div><div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#3a5070;margin-bottom:6px">Standout Reviews</div>'+reviewsHtml+'</div>':'')
     +'</div></div>'
@@ -1019,12 +1023,12 @@ function openBrief(id,biz){
     +'<div class="pitch-ammo-title">&#x1F3AF; Pitch Ammo</div>'
     +pitchAmmoHtml
     +'</div></div>'
-    +'<div class="strat-iframe-wrap"><iframe id="stratIframe" allowfullscreen></iframe></div>'
+    +'<div class="strat-iframe-wrap"><iframe id="stratIframe" srcdoc="'+csEsc+'" style="width:100%;height:100%;border:none"></iframe></div>'
     +'</div></div>'
     // ── Modal
     +'<div class="modal-overlay" id="whyModal"><div class="modal-box"><button class="modal-close" onclick="closeWhyModal()">&#x2715;</button><div class="modal-title">&#x1F4A1; Why a Website Matters in 2026</div><div class="panel-body">'+anglesHtml+'</div></div></div>'
     +'<button class="float-btn" onclick="openWhyModal()">&#x1F4A1; Why a Site?</button>'
-    +'<script>function showTab(btn,id){document.querySelectorAll(".tab-body").forEach(function(t){t.classList.remove("active")});document.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active")});var el=document.getElementById("tab-"+id);if(id==="strategy"){el.style.display="flex";}else{el.classList.add("active");}btn.classList.add("active");}function showOTab(btn,id){document.querySelectorAll(".otab-pane").forEach(function(p){p.classList.remove("active")});document.querySelectorAll(".otab-btn").forEach(function(b){b.classList.remove("active")});var el=document.getElementById("otab-"+id);if(el)el.classList.add("active");btn.classList.add("active");}function scriptNav(btn,id){var f=document.getElementById("stratIframe");if(f&&f.contentDocument){var el=f.contentDocument.getElementById(id);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});}document.querySelectorAll(".snav-btn").forEach(function(b){b.classList.remove("active")});btn.classList.add("active");}function doCopy(btnId,txtId){var t=document.getElementById(txtId).innerText;if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){var b=document.getElementById(btnId);b.textContent="Copied!";setTimeout(function(){b.textContent="📋 Copy";},2000);});}else{var r=document.createRange();r.selectNodeContents(document.getElementById(txtId));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand("copy");}}function openWhyModal(){document.getElementById("whyModal").classList.add("open");}function closeWhyModal(){document.getElementById("whyModal").classList.remove("open");}document.getElementById("whyModal").addEventListener("click",function(e){if(e.target===this)closeWhyModal();});window.addEventListener("load",function(){var iframe=document.getElementById("stratIframe");if(iframe&&window.opener&&window.opener.CALL_SCRIPT_HTML){iframe.srcdoc=window.opener.CALL_SCRIPT_HTML;}});<\/script>'
+    +'<script>function showTab(btn,id){document.querySelectorAll(".tab-body").forEach(function(t){t.style.display='';t.classList.remove("active")});document.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active")});document.getElementById("tab-"+id).classList.add("active");btn.classList.add("active");}function showOTab(btn,id){document.querySelectorAll(".otab-pane").forEach(function(p){p.classList.remove("active")});document.querySelectorAll(".otab-btn").forEach(function(b){b.classList.remove("active")});var el=document.getElementById("otab-"+id);if(el)el.classList.add("active");btn.classList.add("active");}function scriptNav(btn,id){var f=document.getElementById("stratIframe");if(f&&f.contentDocument){var el=f.contentDocument.getElementById(id);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});}document.querySelectorAll(".snav-btn").forEach(function(b){b.classList.remove("active")});btn.classList.add("active");}function doCopy(btnId,txtId){var t=document.getElementById(txtId).innerText;if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){var b=document.getElementById(btnId);b.textContent="Copied!";setTimeout(function(){b.textContent="📋 Copy";},2000);});}else{var r=document.createRange();r.selectNodeContents(document.getElementById(txtId));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand("copy");}}function openWhyModal(){document.getElementById("whyModal").classList.add("open");}function closeWhyModal(){document.getElementById("whyModal").classList.remove("open");}document.getElementById("whyModal").addEventListener("click",function(e){if(e.target===this)closeWhyModal();});<\/script>'
     +'</body></html>';
   const w=window.open('','_blank');
   w.document.write(portalHtml);
