@@ -184,6 +184,13 @@ for c in campaign_log:
     z = str(c.get('ZIP Code','') or '').strip()
     if z: camp_zip_income[z] = str(c.get('Per Capita Income','') or '')
 
+def norm_url(raw):
+    raw = str(raw or '').strip()
+    if not raw or raw.lower() in ('no','n/a','—','-','none',''): return ''
+    if raw.startswith('http'): return raw
+    if '.' in raw and ' ' not in raw: return 'https://' + raw.lstrip('/')
+    return ''
+
 # Build SALES_PORTALS: one entry per lead that has a brief
 sales_portals = {}
 for lead in all_leads:
@@ -204,7 +211,7 @@ for lead in all_leads:
         'zip_area':  zip_area,
         'rating':    lead.get('Rating ★',''),
         'reviews':   lead.get('Reviews',''),
-        'website':   website_raw if website_raw.startswith('http') else '',
+        'website':   norm_url(website_raw),
         'demo_url':  str(lead.get('Staging URL','') or ''),
         'maps_url':  str(lead.get('Maps URL','') or ''),
         'dev_stage': str(lead.get('Dev Stage','') or ''),
@@ -243,6 +250,19 @@ const PLAYBOOK={json.dumps(playbook,ensure_ascii=False)};
 const TRADE_REF={json.dumps(trade_ref,ensure_ascii=False)};
 const REFRESHED="{datetime.date.today()}";
 """
+# Embed call script HTML so portal can access it via window.opener.CALL_SCRIPT_HTML
+_cs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'QF_Sales_Call_Script.html')
+if os.path.exists(_cs_path):
+    with open(_cs_path, encoding='utf-8') as _f:
+        _cs_html = _f.read().replace(
+            '</head>',
+            '<style>.sidebar{display:none!important;}.main{margin-left:0!important;padding-left:32px!important;max-width:none!important;}</style></head>',
+            1)
+    _cs_encoded = json.dumps(_cs_html, ensure_ascii=False).replace('</', '<\/')
+    data_js += 'const CALL_SCRIPT_HTML=' + _cs_encoded + ';\n'
+else:
+    data_js += 'const CALL_SCRIPT_HTML="";\n'
+
 
 HTML = r"""<!DOCTYPE html>
 <html lang="en">
@@ -794,12 +814,27 @@ function openBrief(id,biz){
   function sec(obj,prefix){if(!obj)return'';const k=Object.keys(obj).find(k=>k.toUpperCase().includes(prefix.toUpperCase()));return k?obj[k]:'';}
   function m(text){if(!text)return'<p style="color:#2a4060;font-style:italic">&#x2014;</p>';if(typeof marked!=='undefined')return marked.parse(text);return'<div>'+text.replace(/&/g,'&amp;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')+'</div>';}
   function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-  // ── Data extraction
-  const snapHtml=m(sec(p.brief,'BUSINESS SNAPSHOT'));
-  const mktHtml=m(sec(p.brief,'MARKET CONTEXT'));
-  const roiHtml=m(sec(p.brief,'COST OF A LOST'));
-  const notesHtml=m(sec(p.brief,'NOTES'));
+  // ── OVERVIEW data ──────────────────────────────────────────────────────────
+  const snapRaw=sec(p.brief,'BUSINESS SNAPSHOT');
+  const snapClean=snapRaw.split(/\n\*\*Review hooks/)[0].trim();
+  const snapHtml=m(snapClean);
+  const reviewMatches=[...snapRaw.matchAll(/\*"([^"]+)"\*/g)];
+  const reviews=reviewMatches.slice(0,3).map(function(rm){return rm[1];});
+  const compLandRaw=sec(p.brief,'COMPETITIVE LANDSCAPE');
+  const compTableLines=compLandRaw.split('\n').filter(function(l){return l.startsWith('|')&&!l.includes('---')&&!/^\|\s*(Competitor|Comp\.?)\s*\|/i.test(l);});
+  const compNames=compTableLines.slice(0,3).map(function(l){const cell=(l.split('|')[1]||'');return cell.replace(/\*\*/g,'').replace(/\s*\([^)]*\)/,'').trim();}).filter(Boolean);
   const step0Raw=sec(p.brief,'STEP 0')||sec(p.brief,'PRE-CALL DEMO');
+  const frictionM=step0Raw.match(/\*\*Call friction angle:\*\*\s*(.*)/);
+  const frictionAngle=frictionM?frictionM[1].trim():'';
+  const frictionExplM=step0Raw.match(/\*\*Use this[^\n]*:\*\*\s*(.*)/);
+  const frictionExpl=frictionExplM?frictionExplM[1].trim():'';
+  const roiRaw=sec(p.brief,'COST OF A LOST');
+  const roiLines=roiRaw.split('\n').filter(function(l){return l.startsWith('|')&&!l.includes('---')&&!/^\|\s*(Job Type)/i.test(l);});
+  const bigJobRows=roiLines.filter(function(l){return!l.includes('missed jobs')&&!l.includes('3 missed');}).slice(0,4);
+  const roiHtml=m(roiRaw);
+  const mktHtml=m(sec(p.brief,'MARKET CONTEXT'));
+  // ── OUTREACH data ──────────────────────────────────────────────────────────
+  const notesHtml=m(sec(p.brief,'NOTES'));
   const timingM=step0Raw.match(/^([\s\S]*?)(?=\n---)/);
   const sendTiming=timingM?timingM[1].trim():'';
   const msgM=step0Raw.match(/---\n([\s\S]+?)\n---/);
@@ -808,48 +843,23 @@ function openBrief(id,biz){
   const callBridgeRaw=bridgeM?bridgeM[0].trim():'';
   const coldM=step0Raw.match(/\*\*Opening — cold[\s\S]*?(?=\n\*\*Call friction|\n> ⚠️|\n---\n|$)/i);
   const coldOpenRaw=coldM?coldM[0].trim():'';
-  const callScriptHtml=m(sec(p.brief,'CALL SCRIPT'));
-  const briefObjRaw=sec(p.brief,'OBJECTION')||sec(PLAYBOOK,'PART 6');
-  const briefObjHtml=m(briefObjRaw);
+  // ── STRATEGY data ──────────────────────────────────────────────────────────
+  const callScriptRaw=sec(p.brief,'PITCH AMMO')||sec(p.brief,'CALL SCRIPT');
+  const hookMatches=[...callScriptRaw.matchAll(/\*\*(Hook \d+[^*\n]+):\*\*[\s\S]*?(?:^|^> ?)(.+?)(?=\n\*\*Hook|\n\*\*The Close|$)/gm)];
+  const hookRx=[...callScriptRaw.matchAll(/\*\*(Hook \d[^\*]+)\*\*[^\n]*\n>(.*)/g)];
+  const pitchHooks=hookRx.slice(0,3).map(function(hm){return{label:hm[1].trim(),text:hm[2].trim()};});
   const anglesHtml=m(sec(PLAYBOOK,'PART 1'));
-  // Trade-specific call line
-  const tradeCallSection=sec(TRADE_REF,'QUICK-REFERENCE CALL LINES');
-  let tradeCallHtml='';
-  if(tradeCallSection){
-    const tl=(p.trade||'').toLowerCase();
-    const parts=('\n'+tradeCallSection).split(/\n### /);
-    let match='';
-    for(let i=1;i<parts.length;i++){
-      const fl=parts[i].split('\n')[0].toLowerCase();
-      if((tl.includes('electric')&&fl.includes('electrician'))||(tl.includes('plumb')&&fl.includes('plumber'))||(tl.includes('hvac')&&fl.includes('hvac'))||(tl.includes('roof')&&fl.includes('roofer'))||((tl.includes('gc')||tl.includes('general')||tl.includes('remodel'))&&fl.includes('gc'))){match='### '+parts[i];break;}
-    }
-    tradeCallHtml=m(match||tradeCallSection);
-  }
-  const vcallRaw=p.has_intel?sec(p.intel,'VIDEO CALL')+'\n\n---\n\n'+sec(p.intel,'CALL TO ACTION'):sec(PLAYBOOK,'PART 5');
-  const vcallHtml=m(vcallRaw);
-  const vcallTitle=p.has_intel?'Video Call Talking Points &amp; Close':'Video Call Flow (Playbook)';
-  // ── Intel tab
+  // ── INTEL tab ──────────────────────────────────────────────────────────────
   let intelTabContent='';
+  const intelTopPanels='<div class="two-col">'
+    +'<div class="panel"><div class="panel-title">Market Context</div><div class="panel-body">'+mktHtml+'</div></div>'
+    +'<div class="panel"><div class="panel-title">&#x1F4B5; Avg Job Values</div><div class="panel-body">'+roiHtml+'</div></div>'
+    +'</div>';
   if(p.has_intel){
     const serpRaw=sec(p.intel,'KEYWORD DEMAND');
     const keyObsM=serpRaw.match(/\*\*Key observation:\*\*([\s\S]*?)(?:\n\n|$)/);
     const keyObs=keyObsM?keyObsM[1].trim():'';
     const compRaw=sec(p.intel,"WHO'S WINNING");
-    const compParts=('\n'+compRaw).split(/\n### /);
-    let compCards='';
-    for(let i=1;i<compParts.length;i++){
-      const lines=compParts[i].split('\n');
-      const name=lines[0].trim();
-      const attrs={};
-      lines.slice(1).forEach(function(l){const am=l.match(/^-\s+\*\*([^*:]+):\*\*\s*(.*)/);if(am)attrs[am[1].trim()]=am[2].trim();});
-      compCards+='<div style="background:rgba(0,20,50,.6);border:1px solid rgba(0,212,255,.12);border-radius:3px;padding:12px 14px;margin-bottom:10px">'
-        +'<div style="font-size:14px;font-weight:700;color:#00d4ff;margin-bottom:8px">'+esc(name)+'</div>'
-        +(attrs['Differentiator']?'<div style="margin-bottom:6px;font-size:13px"><span style="color:#f5c400;font-weight:600;font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-right:4px">Edge:</span>'+esc(attrs['Differentiator'])+'</div>':'')
-        +(attrs['Why they rank']?'<div style="margin-bottom:6px;font-size:13px"><span style="color:#00ff9d;font-weight:600;font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-right:4px">Why ranking:</span>'+esc(attrs['Why they rank'])+'</div>':'')
-        +(attrs['Weakness']?'<div style="font-size:13px"><span style="color:#f87171;font-weight:600;font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-right:4px">Weakness:</span>'+esc(attrs['Weakness'])+'</div>':'')
-        +'</div>';
-    }
-    if(!compCards)compCards=m(compRaw);
     const auditRaw=sec(p.intel,'SITE AUDIT')||sec(p.intel,'CURRENT SITE');
     const bottomLineM=auditRaw.match(/\*\*Bottom line:\*\*([\s\S]*?)(?:\n\n|$)/);
     const bottomLine=bottomLineM?bottomLineM[1].trim():'';
@@ -876,36 +886,65 @@ function openBrief(id,biz){
     auditTable+='</tbody></table>';
     if(!auditRows)auditTable=m(auditRaw);
     const aiHtml=m(sec(p.intel,'AI VISIBILITY'));
-    intelTabContent=
-      '<div class="tier-full tier-banner">&#x1F7E2; Full Intel &#x2014; Tier 2. Walk through this on the video call.</div>'
+    intelTabContent=intelTopPanels
+      +'<div class="tier-full tier-banner">&#x1F7E2; Full Intel &#x2014; Tier 2. Walk through this on the video call.</div>'
       +(keyObs?'<div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-left:4px solid #f87171;border-radius:3px;padding:14px 16px;margin-bottom:16px">'
         +'<div style="font-size:11px;font-weight:600;letter-spacing:1.5px;color:#f87171;text-transform:uppercase;margin-bottom:6px">&#x26A0;&#xFE0F; Pain Point &#x2014; Key Observation</div>'
-        +'<div style="font-size:14px;color:#e8c8c8;line-height:1.65">'+esc(keyObs)+'</div>'
-        +'</div>':'')
-      +'<div class="panel"><div class="panel-title">Current Site Audit</div><div class="panel-body">'
-      +auditTable
+        +'<div style="font-size:14px;color:#e8c8c8;line-height:1.65">'+esc(keyObs)+'</div></div>':'')
+      +'<div class="panel"><div class="panel-title">Current Site Audit</div><div class="panel-body">'+auditTable
       +(bottomLine?'<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.25);border-left:3px solid #f87171;border-radius:2px;padding:10px 14px;margin-top:14px"><span style="font-size:11px;font-weight:700;letter-spacing:1px;color:#f87171;text-transform:uppercase">Bottom Line: </span><span style="font-size:13px;color:#c8a8a8">'+esc(bottomLine)+'</span></div>':'')
       +'</div></div>'
-      +'<div class="panel"><div class="panel-title">Top Competitors</div><div class="panel-body">'+compCards+'</div></div>'
+      +'<div class="panel"><div class="panel-title">Top Competitors</div><div class="panel-body">'+m(compRaw)+'</div></div>'
       +(aiHtml?'<div class="panel"><div class="panel-title">AI Visibility Assessment</div><div class="panel-body">'+aiHtml+'</div></div>':'');
   }else{
-    intelTabContent=
-      '<div class="tier-std tier-banner">&#x1F7E1; Standard Brief (Tier 1) &#x2014; Run /lead-intel after video call confirmed to unlock full intel.</div>'
-      +'<div class="panel"><div class="panel-title">Competitive Landscape</div><div class="panel-body">'+m(sec(p.brief,'COMPETITIVE LANDSCAPE'))+'</div></div>';
+    intelTabContent=intelTopPanels
+      +'<div class="tier-std tier-banner">&#x1F7E1; Standard Brief (Tier 1) &#x2014; Run /lead-intel after video call confirmed to unlock full intel.</div>'
+      +'<div class="panel"><div class="panel-title">Competitive Landscape</div><div class="panel-body">'+m(compLandRaw)+'</div></div>';
   }
-  // ── Badges
+  // ── Badges ─────────────────────────────────────────────────────────────────
   const stageBadge=p.dev_stage&&p.dev_stage.includes('Completed')
     ?'<span style="background:rgba(0,255,157,.12);color:#00ff9d;border:1px solid rgba(0,255,157,.3);padding:2px 8px;border-radius:2px;font-size:11px;font-weight:600">&#x2705; Pitch Ready</span>'
     :p.dev_stage?'<span style="background:rgba(245,196,0,.1);color:#f5c400;border:1px solid rgba(245,196,0,.3);padding:2px 8px;border-radius:2px;font-size:11px">'+esc(p.dev_stage)+'</span>':'';
   const intelBadge=p.has_intel
     ?'<span style="background:rgba(0,255,157,.1);color:#00ff9d;border:1px solid rgba(0,255,157,.25);padding:2px 8px;border-radius:2px;font-size:11px;font-weight:600">&#x1F7E2; Full Intel</span>'
     :'<span style="background:rgba(245,196,0,.08);color:#f5c400;border:1px solid rgba(245,196,0,.2);padding:2px 8px;border-radius:2px;font-size:11px">&#x1F7E1; Standard Brief</span>';
-  // ── CSS
-  const css='*{box-sizing:border-box;margin:0;padding:0}:root{--c:#00d4ff;--g:#00ff9d;--y:#f5c400;--bg:#060b18;--panel:#0d1528;--border:rgba(0,212,255,.2)}body{font-family:\'Rajdhani\',sans-serif;background:var(--bg);color:#c8d8e8;min-height:100vh}body::before{content:\'\';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}a{color:var(--c);text-decoration:none}.hdr{position:relative;z-index:10;background:linear-gradient(180deg,rgba(0,20,50,.98),rgba(6,11,24,.95));border-bottom:1px solid var(--border);padding:14px 24px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.hdr-left{flex:1;min-width:0}.hdr-title{font-size:22px;font-weight:700;letter-spacing:2px;color:var(--c);text-shadow:0 0 12px rgba(0,212,255,.6);margin-bottom:6px}.hdr-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.hdr-contact{font-size:13px;color:#4a7090;display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px}.hdr-owner{font-size:12px;color:#3a6080;margin-bottom:2px}.hdr-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0}.btn-demo{background:linear-gradient(90deg,rgba(0,255,157,.15),rgba(0,212,255,.1));border:1px solid rgba(0,255,157,.4);color:var(--g);padding:9px 18px;border-radius:3px;font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-decoration:none;display:inline-block}.btn-site{background:rgba(245,196,0,.06);border:1px solid rgba(245,196,0,.3);color:#c8a840;padding:7px 14px;border-radius:3px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;text-decoration:none;display:inline-block}.tab-nav{position:relative;z-index:10;display:flex;background:rgba(6,11,24,.95);border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto}.tab-btn{padding:11px 22px;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#3a5570;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;font-family:\'Rajdhani\',sans-serif}.tab-btn:hover{color:#0090cc}.tab-btn.active{color:var(--c);border-bottom-color:var(--c)}.tab-body{display:none;padding:20px 24px;position:relative;z-index:2;max-width:980px;margin:0 auto}.tab-body.active{display:block}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:680px){.two-col{grid-template-columns:1fr}}.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;margin-bottom:16px;overflow:hidden;position:relative}.panel::before{content:\'\';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--c),transparent);opacity:.3}.panel-title{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#3a7090;padding:10px 16px 8px;border-bottom:1px solid rgba(0,212,255,.08)}.panel-body{padding:14px 16px}.panel-body h1,.panel-body h2,.panel-body h3{color:var(--c);margin:14px 0 6px;letter-spacing:.5px}.panel-body h1{font-size:17px}.panel-body h2{font-size:15px}.panel-body h3{font-size:14px;color:#8ab0c8}.panel-body p{margin-bottom:8px;font-size:13px;line-height:1.65}.panel-body ul{margin:6px 0 10px 22px;list-style:disc}.panel-body li{margin-bottom:4px;font-size:13px;line-height:1.5}.panel-body strong{color:var(--y)}.panel-body em{color:#a78bfa}.panel-body blockquote{border-left:3px solid rgba(0,212,255,.4);padding:6px 14px;margin:8px 0;color:#8ab0c8;font-size:13px;background:rgba(0,212,255,.03);border-radius:0 3px 3px 0}.panel-body table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}.panel-body th{background:rgba(0,212,255,.06);padding:7px 10px;text-align:left;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#2a6080;border-bottom:1px solid rgba(0,212,255,.1)}.panel-body td{padding:6px 10px;border-bottom:1px solid rgba(0,212,255,.05);font-size:13px}.panel-body tr:hover td{background:rgba(0,212,255,.03)}.panel-body hr{border:none;border-top:1px solid rgba(0,212,255,.1);margin:14px 0}.copy-block{background:#070e1c;border:1px solid rgba(0,255,157,.2);border-radius:3px;margin:12px 0}.copy-hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid rgba(0,255,157,.1)}.copy-hdr span{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#2a7060}.copy-btn{background:rgba(0,255,157,.1);border:1px solid rgba(0,255,157,.3);color:var(--g);padding:5px 14px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}.copy-btn:hover{background:rgba(0,255,157,.2)}.copy-msg{padding:14px;font-size:13px;color:#8ab8a8;line-height:1.7;white-space:pre-wrap;font-family:\'Rajdhani\',sans-serif}.tier-banner{padding:10px 16px;margin-bottom:16px;border-radius:3px;font-size:13px;font-weight:600;letter-spacing:.5px}.tier-full{background:rgba(0,255,157,.07);border:1px solid rgba(0,255,157,.25);color:var(--g)}.tier-std{background:rgba(245,196,0,.07);border:1px solid rgba(245,196,0,.2);color:var(--y)}.otabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}.otab-btn{background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.15);color:#3a6080;padding:7px 16px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:.5px;transition:all .15s}.otab-btn:hover{color:#0090cc;border-color:rgba(0,212,255,.3)}.otab-btn.active{background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.5);color:var(--c)}.otab-pane{display:none}.otab-pane.active{display:block}.send-note{background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.12);border-radius:3px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#4a8090;line-height:1.6}';
-  // ── Build portal HTML
+  // ── CSS ────────────────────────────────────────────────────────────────────
+  const css='*{box-sizing:border-box;margin:0;padding:0}:root{--c:#00d4ff;--g:#00ff9d;--y:#f5c400;--bg:#060b18;--panel:#0d1528;--border:rgba(0,212,255,.2)}body{font-family:\'Rajdhani\',sans-serif;background:var(--bg);color:#c8d8e8;min-height:100vh}body::before{content:\'\';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}a{color:var(--c);text-decoration:none}.hdr{position:relative;z-index:10;background:linear-gradient(180deg,rgba(0,20,50,.98),rgba(6,11,24,.95));border-bottom:1px solid var(--border);padding:14px 24px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.hdr-left{flex:1;min-width:0}.hdr-title{font-size:22px;font-weight:700;letter-spacing:2px;color:var(--c);text-shadow:0 0 12px rgba(0,212,255,.6);margin-bottom:6px}.hdr-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.hdr-contact{font-size:13px;color:#4a7090;display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px}.hdr-owner{font-size:12px;color:#3a6080;margin-bottom:2px}.hdr-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0}.btn-demo{background:linear-gradient(90deg,rgba(0,255,157,.15),rgba(0,212,255,.1));border:1px solid rgba(0,255,157,.4);color:var(--g);padding:9px 18px;border-radius:3px;font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-decoration:none;display:inline-block}.btn-site{background:rgba(245,196,0,.06);border:1px solid rgba(245,196,0,.3);color:#c8a840;padding:7px 14px;border-radius:3px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;text-decoration:none;display:inline-block}.tab-nav{position:relative;z-index:10;display:flex;background:rgba(6,11,24,.95);border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto}.tab-btn{padding:11px 22px;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#3a5570;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;font-family:\'Rajdhani\',sans-serif}.tab-btn:hover{color:#0090cc}.tab-btn.active{color:var(--c);border-bottom-color:var(--c)}.tab-body{display:none;padding:20px 24px;position:relative;z-index:2;max-width:980px;margin:0 auto}.tab-body.active{display:block}#tab-strategy.active{display:flex;padding:0;max-width:none;margin:0;height:calc(100vh - 108px);overflow:hidden}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:680px){.two-col{grid-template-columns:1fr}}.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;margin-bottom:16px;overflow:hidden;position:relative}.panel::before{content:\'\';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--c),transparent);opacity:.3}.panel-title{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#3a7090;padding:10px 16px 8px;border-bottom:1px solid rgba(0,212,255,.08)}.panel-body{padding:14px 16px}.panel-body h1,.panel-body h2,.panel-body h3{color:var(--c);margin:14px 0 6px;letter-spacing:.5px}.panel-body h1{font-size:17px}.panel-body h2{font-size:15px}.panel-body h3{font-size:14px;color:#8ab0c8}.panel-body p{margin-bottom:8px;font-size:13px;line-height:1.65}.panel-body ul{margin:6px 0 10px 22px;list-style:disc}.panel-body li{margin-bottom:4px;font-size:13px;line-height:1.5}.panel-body strong{color:var(--y)}.panel-body em{color:#a78bfa}.panel-body blockquote{border-left:3px solid rgba(0,212,255,.4);padding:6px 14px;margin:8px 0;color:#8ab0c8;font-size:13px;background:rgba(0,212,255,.03);border-radius:0 3px 3px 0}.panel-body table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}.panel-body th{background:rgba(0,212,255,.06);padding:7px 10px;text-align:left;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#2a6080;border-bottom:1px solid rgba(0,212,255,.1)}.panel-body td{padding:6px 10px;border-bottom:1px solid rgba(0,212,255,.05);font-size:13px}.panel-body tr:hover td{background:rgba(0,212,255,.03)}.panel-body hr{border:none;border-top:1px solid rgba(0,212,255,.1);margin:14px 0}.copy-block{background:#070e1c;border:1px solid rgba(0,255,157,.2);border-radius:3px;margin:12px 0}.copy-hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid rgba(0,255,157,.1)}.copy-hdr span{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#2a7060}.copy-btn{background:rgba(0,255,157,.1);border:1px solid rgba(0,255,157,.3);color:var(--g);padding:5px 14px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}.copy-btn:hover{background:rgba(0,255,157,.2)}.copy-msg{padding:14px;font-size:13px;color:#8ab8a8;line-height:1.7;white-space:pre-wrap;font-family:\'Rajdhani\',sans-serif}.tier-banner{padding:10px 16px;margin-bottom:16px;border-radius:3px;font-size:13px;font-weight:600;letter-spacing:.5px}.tier-full{background:rgba(0,255,157,.07);border:1px solid rgba(0,255,157,.25);color:var(--g)}.tier-std{background:rgba(245,196,0,.07);border:1px solid rgba(245,196,0,.2);color:var(--y)}.otabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}.otab-btn{background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.15);color:#3a6080;padding:7px 16px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:.5px;transition:all .15s}.otab-btn:hover{color:#0090cc;border-color:rgba(0,212,255,.3)}.otab-btn.active{background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.5);color:var(--c)}.otab-pane{display:none}.otab-pane.active{display:block}.send-note{background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.12);border-radius:3px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#4a8090;line-height:1.6}.comp-chip{background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);color:#4a9090;padding:3px 10px;border-radius:2px;font-size:12px;font-weight:600;letter-spacing:.5px}.job-val-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(0,212,255,.06)}.job-val-row:last-child{border-bottom:none}.job-val-label{font-size:12px;color:#4a7080;max-width:55%}.job-val-amount{font-size:16px;font-weight:700;color:#00ff9d;text-align:right}.review-hook{font-size:12px;color:#7ab0b0;border-left:2px solid rgba(0,212,255,.25);padding:4px 10px;margin-bottom:6px;font-style:italic;line-height:1.5}.strat-wrap{display:flex;height:100%;overflow:hidden;width:100%}.strat-nav{width:220px;flex-shrink:0;background:#080d1a;border-right:1px solid rgba(0,212,255,.12);overflow-y:auto;display:flex;flex-direction:column}.strat-nav-inner{padding:10px 8px;flex:1}.strat-nav-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#2a4560;padding:10px 8px 4px}.snav-btn{display:block;width:100%;text-align:left;background:transparent;border:none;color:#3a6080;padding:7px 10px;border-radius:2px;font-family:\'Rajdhani\',sans-serif;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:.5px;transition:all .12s;margin-bottom:1px}.snav-btn:hover{background:rgba(0,212,255,.06);color:#7ab0cc}.snav-btn.active{background:rgba(0,212,255,.1);color:var(--c);border-left:2px solid var(--c);padding-left:8px}.phase-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}.strat-iframe-wrap{flex:1;overflow:hidden}.strat-iframe-wrap iframe{width:100%;height:100%;border:none}.pitch-ammo{padding:12px 10px;border-top:1px solid rgba(0,212,255,.1);margin-top:auto}.pitch-ammo-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#2a4560;margin-bottom:8px}.hook-card{background:rgba(0,20,50,.7);border:1px solid rgba(0,212,255,.1);border-radius:2px;padding:8px 10px;margin-bottom:6px}.hook-label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#2a7060;margin-bottom:3px}.hook-text{font-size:11px;color:#7ab8a8;line-height:1.5;font-style:italic}.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}.modal-overlay.open{display:flex}.modal-box{background:#0d1528;border:1px solid var(--border);border-radius:6px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;padding:24px;position:relative}.modal-close{position:absolute;top:12px;right:16px;background:transparent;border:none;color:#3a6080;font-size:20px;cursor:pointer;font-family:\'Rajdhani\',sans-serif}.modal-title{font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--c);margin-bottom:16px}.float-btn{position:fixed;bottom:24px;right:24px;background:linear-gradient(135deg,rgba(0,212,255,.2),rgba(192,132,252,.2));border:1px solid rgba(192,132,252,.4);color:#c084fc;padding:10px 16px;border-radius:24px;font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;z-index:50;box-shadow:0 4px 20px rgba(192,132,252,.2)}';
+  // ── Battle card & job value HTML ───────────────────────────────────────────
+  const compChips=compNames.length?compNames.map(function(n){return'<span class="comp-chip">'+esc(n)+'</span>';}).join(' '):'<span style="color:#2a4060;font-size:12px">See Competitive Landscape tab</span>';
+  const reviewsHtml=reviews.length?reviews.map(function(r){return'<div class="review-hook">&#x201C;'+esc(r)+'&#x201D;</div>';}).join(''):'';
+  const jobValsHtml=bigJobRows.length?bigJobRows.map(function(row){
+    const cells=row.split('|').map(function(c){return c.trim();}).filter(function(c){return c;});
+    if(cells.length<2)return'';
+    const lbl=cells[0].replace(/\*\*/g,'').trim();
+    const val=cells[1].replace(/\*\*/g,'').trim();
+    return'<div class="job-val-row"><span class="job-val-label">'+esc(lbl)+'</span><span class="job-val-amount">'+esc(val)+'</span></div>';
+  }).join(''):'<div style="color:#2a4060;font-size:12px">See brief for job values</div>';
+  // ── Strategy left nav ──────────────────────────────────────────────────────
+  const phases=[
+    {id:'overview',dot:'',label:'Pipeline Overview'},
+    {id:'brief',dot:'',label:'Using the Brief'},
+    {id:'p1',dot:'#a78bfa',label:'Phase 01: Open'},
+    {id:'p2',dot:'#60a5fa',label:'Phase 02: Discovery'},
+    {id:'p3',dot:'#f59e0b',label:'Phase 03: Deepen Pain'},
+    {id:'p4',dot:'#00e5a0',label:'Phase 04: The Reveal'},
+    {id:'p5',dot:'#f472b6',label:'Phase 05: Commitment'},
+    {id:'p6',dot:'#ef4444',label:'Phase 06: Close / Bridge'},
+    {id:'objections',dot:'',label:'Objections'},
+    {id:'techniques',dot:'',label:'Techniques'}
+  ];
+  const navHtml=phases.map(function(ph,i){
+    const dot=ph.dot?'<span class="phase-dot" style="background:'+ph.dot+'"></span>':'<span style="display:inline-block;width:14px"></span>';
+    return'<button class="snav-btn'+(i===0?' active':'')+'" onclick="scriptNav(this,\''+ph.id+'\')">'+dot+esc(ph.label)+'</button>';
+  }).join('');
+  const pitchAmmoHtml=pitchHooks.length?pitchHooks.map(function(h){
+    return'<div class="hook-card"><div class="hook-label">'+esc(h.label)+'</div><div class="hook-text">'+esc(h.text)+'</div></div>';
+  }).join(''):'<div style="font-size:11px;color:#2a4060">No prospect hooks found — check the brief\'s Call Script section.</div>';
+  // ── Build portal HTML ──────────────────────────────────────────────────────
   const portalHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>'+esc(biz)+' &#x2014; Sales Portal</title>'
     +'<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>'
     +'<style>'+css+'</style></head><body>'
+    // Header
     +'<div class="hdr"><div class="hdr-left">'
     +'<div class="hdr-title">'+esc(biz)+'</div>'
     +'<div class="hdr-meta"><span style="background:rgba(0,212,255,.08);color:#4a9090;border:1px solid rgba(0,212,255,.2);padding:2px 9px;border-radius:2px;font-size:11px;letter-spacing:1px">'+esc(p.trade)+'</span>'
@@ -913,7 +952,7 @@ function openBrief(id,biz){
     +' '+stageBadge+' '+intelBadge+'</div>'
     +'<div class="hdr-contact">'
     +(p.phone?'<span>&#x1F4DE; <a href="tel:'+p.phone.replace(/\D/g,'')+'" style="color:#00ff9d;font-weight:600">'+esc(p.phone)+'</a></span>':'')
-    +(p.email&&p.email!='N/A'&&p.email!='n/a'?'<span>&#x2709;&#xFE0F; <a href="mailto:'+p.email+'" style="color:#00d4ff">'+esc(p.email)+'</a></span>':'')
+    +(p.email&&p.email.toLowerCase()!='n/a'?'<span>&#x2709;&#xFE0F; <a href="mailto:'+p.email+'" style="color:#00d4ff">'+esc(p.email)+'</a></span>':'')
     +(p.address?'<span>&#x1F4CD; <a href="'+p.maps_url+'" target="_blank" style="color:#6aaa9a">'+esc(p.address)+'</a></span>':'')
     +(p.zip_income?'<span>&#x1F4B0; Area Income: <span style="color:#00ff9d;font-weight:600">'+esc(p.zip_income)+'</span></span>':'')
     +'</div>'
@@ -922,23 +961,39 @@ function openBrief(id,biz){
     +(p.demo_url?'<a href="'+p.demo_url+'" target="_blank" class="btn-demo">&#x1F310; Our Demo Site &#x2197;</a>':'')
     +(p.website?'<a href="'+p.website+'" target="_blank" class="btn-site">&#x1F517; Current Prospect Website &#x2197;</a>':'')
     +'</div></div>'
+    // Tab nav
     +'<div class="tab-nav">'
     +'<button class="tab-btn active" onclick="showTab(this,\'overview\')">&#x1F4CB; Overview</button>'
     +'<button class="tab-btn" onclick="showTab(this,\'outreach\')">&#x1F4E8; Outreach</button>'
     +'<button class="tab-btn" onclick="showTab(this,\'intel\')">&#x1F50D; Intel</button>'
     +'<button class="tab-btn" onclick="showTab(this,\'strategy\')">&#x26A1; Strategy</button>'
     +'</div>'
-    // Overview tab
+    // ── OVERVIEW TAB
     +'<div id="tab-overview" class="tab-body active">'
-    +'<div class="panel" style="border-color:rgba(0,255,157,.3)"><div class="panel-title" style="color:#00ff9d">&#x1F4B5; Avg Job Values &#x2014; Cost of a Lost Customer</div><div class="panel-body">'+roiHtml+'</div></div>'
-    +'<div class="two-col">'
-    +'<div class="panel"><div class="panel-title">Business Snapshot</div><div class="panel-body">'+snapHtml+'</div></div>'
-    +'<div class="panel"><div class="panel-title">Market Context</div><div class="panel-body">'+mktHtml+'</div></div>'
+    +'<div class="two-col" style="margin-bottom:16px">'
+    // Battle Card
+    +'<div class="panel" style="border-color:rgba(192,132,252,.25)"><div class="panel-title" style="color:#c084fc">&#x26A1; Battle Card</div><div class="panel-body">'
+    +'<div style="margin-bottom:12px"><div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#3a5070;margin-bottom:6px">Top Competitors</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+compChips+'</div></div>'
+    +(frictionAngle?'<div style="margin-bottom:12px"><div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#3a5070;margin-bottom:4px">Their Biggest Gap</div>'
+      +'<div style="font-size:13px;color:#f5c400;font-weight:600">'+esc(frictionAngle)+'</div>'
+      +(frictionExpl?'<div style="font-size:12px;color:#7a9090;margin-top:3px;line-height:1.5">'+esc(frictionExpl)+'</div>':'')
+      +'</div>':'')
+    +(reviewsHtml?'<div><div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#3a5070;margin-bottom:6px">Standout Reviews</div>'+reviewsHtml+'</div>':'')
     +'</div></div>'
-    // Outreach tab
+    // Job Values
+    +'<div class="panel" style="border-color:rgba(0,255,157,.2)"><div class="panel-title" style="color:#00ff9d">&#x1F4B5; What These Jobs Pay</div><div class="panel-body">'
+    +jobValsHtml
+    +'</div></div>'
+    +'</div>'
+    // Business Snapshot
+    +'<div class="panel"><div class="panel-title">Business Snapshot</div><div class="panel-body">'+snapHtml+'</div></div>'
+    +'</div>'
+    // ── OUTREACH TAB
     +'<div id="tab-outreach" class="tab-body">'
-    +'<div class="panel"><div class="panel-title">Notes &amp; Best Call Times</div><div class="panel-body">'+notesHtml+'</div></div>'
-    +'<div class="panel"><div class="panel-title">Pre-Call Demo Drop</div><div class="panel-body">'
+    +'<div style="display:grid;grid-template-columns:35fr 65fr;gap:16px;align-items:start">'
+    +'<div class="panel" style="margin-bottom:0"><div class="panel-title">Notes &amp; Best Call Times</div><div class="panel-body">'+notesHtml+'</div></div>'
+    +'<div class="panel" style="margin-bottom:0"><div class="panel-title">Pre-Call Demo Drop</div><div class="panel-body">'
     +(sendTiming?'<div class="send-note">'+esc(sendTiming).replace(/\n/g,'<br>')+'</div>':'')
     +'<div class="otabs">'
     +(preCallMsg?'<button class="otab-btn active" onclick="showOTab(this,\'precall\')">&#x1F4AC; Pre-Call Message</button>':'')
@@ -950,17 +1005,26 @@ function openBrief(id,biz){
     +(coldOpenRaw?'<div class="otab-pane'+(preCallMsg||callBridgeRaw?'':' active')+'" id="otab-cold"><div class="copy-block"><div class="copy-hdr"><span>Cold open (no pre-call drop sent)</span><button class="copy-btn" id="cpbtn3" onclick="doCopy(\'cpbtn3\',\'ctxt3\')">&#x1F4CB; Copy</button></div><div class="copy-msg" id="ctxt3">'+esc(coldOpenRaw)+'</div></div></div>':'')
     +'</div></div>'
     +'</div>'
-    // Intel tab
-    +'<div id="tab-intel" class="tab-body">'+intelTabContent+'</div>'
-    // Strategy tab
-    +'<div id="tab-strategy" class="tab-body">'
-    +'<div class="panel"><div class="panel-title">Call Script</div><div class="panel-body">'+callScriptHtml+'</div></div>'
-    +'<div class="panel"><div class="panel-title">'+vcallTitle+'</div><div class="panel-body">'+vcallHtml+'</div></div>'
-    +'<div class="panel"><div class="panel-title">Objection Handling</div><div class="panel-body">'+briefObjHtml+'</div></div>'
-    +(tradeCallHtml?'<div class="panel"><div class="panel-title">Trade Call Line &#x2014; '+esc(p.trade)+'</div><div class="panel-body">'+tradeCallHtml+'</div></div>':'')
-    +'<div class="panel"><div class="panel-title">Top 10 Angles &#x2014; Why a Website Matters</div><div class="panel-body">'+anglesHtml+'</div></div>'
     +'</div>'
-    +'<script>function showTab(btn,id){document.querySelectorAll(".tab-body").forEach(function(t){t.classList.remove("active")});document.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active")});document.getElementById("tab-"+id).classList.add("active");btn.classList.add("active");}function showOTab(btn,id){document.querySelectorAll(".otab-pane").forEach(function(p){p.classList.remove("active")});document.querySelectorAll(".otab-btn").forEach(function(b){b.classList.remove("active")});var el=document.getElementById("otab-"+id);if(el)el.classList.add("active");btn.classList.add("active");}function doCopy(btnId,txtId){var t=document.getElementById(txtId).innerText;if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){var b=document.getElementById(btnId);b.textContent="Copied!";setTimeout(function(){b.textContent="📋 Copy";},2000);});}else{var r=document.createRange();r.selectNodeContents(document.getElementById(txtId));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand("copy");}}<\/script>'
+    // ── INTEL TAB
+    +'<div id="tab-intel" class="tab-body">'+intelTabContent+'</div>'
+    // ── STRATEGY TAB
+    +'<div id="tab-strategy" class="tab-body">'
+    +'<div class="strat-wrap">'
+    +'<div class="strat-nav"><div class="strat-nav-inner">'
+    +'<div class="strat-nav-label">Call Phases</div>'
+    +navHtml
+    +'</div>'
+    +'<div class="pitch-ammo">'
+    +'<div class="pitch-ammo-title">&#x1F3AF; Pitch Ammo</div>'
+    +pitchAmmoHtml
+    +'</div></div>'
+    +'<div class="strat-iframe-wrap"><iframe id="stratIframe" allowfullscreen></iframe></div>'
+    +'</div></div>'
+    // ── Modal
+    +'<div class="modal-overlay" id="whyModal"><div class="modal-box"><button class="modal-close" onclick="closeWhyModal()">&#x2715;</button><div class="modal-title">&#x1F4A1; Why a Website Matters in 2026</div><div class="panel-body">'+anglesHtml+'</div></div></div>'
+    +'<button class="float-btn" onclick="openWhyModal()">&#x1F4A1; Why a Site?</button>'
+    +'<script>function showTab(btn,id){document.querySelectorAll(".tab-body").forEach(function(t){t.classList.remove("active")});document.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active")});var el=document.getElementById("tab-"+id);if(id==="strategy"){el.style.display="flex";}else{el.classList.add("active");}btn.classList.add("active");}function showOTab(btn,id){document.querySelectorAll(".otab-pane").forEach(function(p){p.classList.remove("active")});document.querySelectorAll(".otab-btn").forEach(function(b){b.classList.remove("active")});var el=document.getElementById("otab-"+id);if(el)el.classList.add("active");btn.classList.add("active");}function scriptNav(btn,id){var f=document.getElementById("stratIframe");if(f&&f.contentDocument){var el=f.contentDocument.getElementById(id);if(el)el.scrollIntoView({behavior:"smooth",block:"start"});}document.querySelectorAll(".snav-btn").forEach(function(b){b.classList.remove("active")});btn.classList.add("active");}function doCopy(btnId,txtId){var t=document.getElementById(txtId).innerText;if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){var b=document.getElementById(btnId);b.textContent="Copied!";setTimeout(function(){b.textContent="📋 Copy";},2000);});}else{var r=document.createRange();r.selectNodeContents(document.getElementById(txtId));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand("copy");}}function openWhyModal(){document.getElementById("whyModal").classList.add("open");}function closeWhyModal(){document.getElementById("whyModal").classList.remove("open");}document.getElementById("whyModal").addEventListener("click",function(e){if(e.target===this)closeWhyModal();});window.addEventListener("load",function(){var iframe=document.getElementById("stratIframe");if(iframe&&window.opener&&window.opener.CALL_SCRIPT_HTML){iframe.srcdoc=window.opener.CALL_SCRIPT_HTML;}});<\/script>'
     +'</body></html>';
   const w=window.open('','_blank');
   w.document.write(portalHtml);
