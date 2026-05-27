@@ -826,6 +826,14 @@ function openBrief(id,biz){
   const bigJobRows=roiLines.filter(function(l){return!l.includes('missed jobs')&&!l.includes('3 missed');}).slice(0,4);
   const roiHtml=m(roiRaw);
   const mktHtml=m(sec(p.brief,'MARKET CONTEXT'));
+  // ── TOP JOBS extraction ───────────────────────────────────────────────────
+  const topJobsRaw=sec(p.brief,'TOP JOBS')||sec(p.brief,'JOB MIX INTELLIGENCE')||'';
+  const topJobRows=topJobsRaw.split('\n').filter(function(l){return l.startsWith('|')&&!l.includes('---');});
+  // Detect format: TOP JOBS has "# | Job Type | Avg Value" (col1=name, col2=val)
+  // JOB MIX has "Job Type | Signal Strength | Avg Value" (col0=name, col2=val)
+  const isJobMixFmt=topJobsRaw.indexOf('Signal Strength')>-1;
+  const topJobRepNote=topJobsRaw.match(/>\s*💡\s*\*\*Rep note[^*]*\*\*[:\s]*(.*)/i);
+  const topJobNote=topJobRepNote?topJobRepNote[1].trim():'';
   // "The gap" text from brief competitive landscape
   const compGapM=compLandRaw.match(/\*\*The gap:\*\*([\s\S]*?)(?:\n\n|$)/i);
   const compGap=compGapM?compGapM[1].trim():'';
@@ -1024,13 +1032,29 @@ function openBrief(id,biz){
   // ── Battle card & job value HTML ───────────────────────────────────────────
   const compChips=compNames.length?compNames.map(function(n){return'<span class="comp-chip">'+esc(n)+'</span>';}).join(' '):'<span style="color:#2a4060;font-size:12px">See Competitive Landscape tab</span>';
   const reviewsHtml=reviews.length?reviews.map(function(r){return'<div class="review-hook">&#x201C;'+esc(r)+'&#x201D;</div>';}).join(''):'';
-  const jobValsHtml=bigJobRows.length?bigJobRows.map(function(row){
-    const cells=row.split('|').map(function(c){return c.trim();}).filter(function(c){return c;});
-    if(cells.length<2)return'';
-    const lbl=cells[0].replace(/\*\*/g,'').trim();
-    const val=cells[1].replace(/\*\*/g,'').trim();
-    return'<div class="job-val-row"><span class="job-val-label">'+esc(lbl)+'</span><span class="job-val-amount">'+esc(val)+'</span></div>';
-  }).join(''):'<div style="color:#2a4060;font-size:12px">See brief for job values</div>';
+  // Build top jobs cards from TOP JOBS / JOB MIX section
+  const jobValsHtml=(function(){
+    if(!topJobRows.length) return '<div style="color:#2a4060;font-size:12px">See brief for job values</div>';
+    // Filter header rows and parse
+    const dataRows=topJobRows.filter(function(l){
+      const low=l.toLowerCase();
+      return !low.includes('job type')&&!low.includes('# |')&&low.indexOf('|')>-1;
+    }).slice(0,6);
+    if(!dataRows.length) return '<div style="color:#2a4060;font-size:12px">See brief for job values</div>';
+    let html='';
+    dataRows.forEach(function(row){
+      const cells=row.split('|').map(function(c){return c.replace(/\*\*/g,'').trim();}).filter(Boolean);
+      if(cells.length<3) return;
+      const nameIdx=isJobMixFmt?0:1;
+      const valIdx=2;
+      const name=cells[nameIdx]||'';
+      const val=cells[valIdx]||'';
+      if(!name||name==='#') return;
+      html+='<div class="job-val-row"><span class="job-val-label">'+esc(name)+'</span><span class="job-val-amount">'+esc(val)+'</span></div>';
+    });
+    if(topJobNote) html+='<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,212,255,.07);font-size:11px;color:#4a7080;line-height:1.5;font-style:italic">💡 '+esc(topJobNote)+'</div>';
+    return html||'<div style="color:#2a4060;font-size:12px">See brief for job values</div>';
+  })();
   // ── Strategy left nav ──────────────────────────────────────────────────────
   const phases=[
     {id:'overview',dot:'',label:'Pipeline Overview'},
@@ -1084,7 +1108,7 @@ function openBrief(id,biz){
     +'<div id="tab-overview" class="tab-body active">'
     +'<div class="two-col">'
     +'<div class="panel" style="margin-bottom:0"><div class="panel-title">Business Snapshot</div><div class="panel-body">'+snapHtml+'</div></div>'
-    +'<div class="panel" style="border-color:rgba(0,255,157,.2);margin-bottom:0"><div class="panel-title" style="color:#00ff9d">&#x1F4B5; What These Jobs Pay</div><div class="panel-body">'+jobValsHtml+'</div></div>'
+    +'<div class="panel" style="border-color:rgba(0,255,157,.2);margin-bottom:0"><div class="panel-title" style="color:#00ff9d">&#x1F527; Top Jobs &amp; What They Pay</div><div class="panel-body">'+jobValsHtml+'</div></div>'
     +'</div>'
     +'</div>'
     // ── OUTREACH TAB
