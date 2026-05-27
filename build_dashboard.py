@@ -251,18 +251,6 @@ const PLAYBOOK={json.dumps(playbook,ensure_ascii=False)};
 const TRADE_REF={json.dumps(trade_ref,ensure_ascii=False)};
 const REFRESHED="{datetime.date.today()}";
 """
-# Embed call script HTML so portal can access it via window.opener.CALL_SCRIPT_HTML
-_cs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'QF_Sales_Call_Script.html')
-if os.path.exists(_cs_path):
-    with open(_cs_path, encoding='utf-8') as _f:
-        _cs_html = _f.read().replace(
-            '</head>',
-            '<style>.sidebar{display:none!important;}.main{margin-left:0!important;padding-left:32px!important;max-width:none!important;}</style></head>',
-            1)
-    _cs_encoded = json.dumps(_cs_html, ensure_ascii=False).replace('</', '<\/')
-    data_js += 'const CALL_SCRIPT_HTML=' + _cs_encoded + ';\n'
-else:
-    data_js += 'const CALL_SCRIPT_HTML="";\n'
 
 
 HTML = r"""<!DOCTYPE html>
@@ -944,7 +932,6 @@ function openBrief(id,biz){
     return'<div class="hook-card"><div class="hook-label">'+esc(h.label)+'</div><div class="hook-text">'+esc(h.text)+'</div></div>';
   }).join(''):'<div style="font-size:11px;color:#2a4060">No prospect hooks found — check the brief\'s Call Script section.</div>';
   // ── Build portal HTML ──────────────────────────────────────────────────────
-  const csEsc=(typeof CALL_SCRIPT_HTML!=='undefined'&&CALL_SCRIPT_HTML)?CALL_SCRIPT_HTML.replace(/"/g,'&quot;'):'';
   const portalHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>'+esc(biz)+' &#x2014; Sales Portal</title>'
     +'<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>'
     +'<style>'+css+'</style></head><body>'
@@ -1023,7 +1010,7 @@ function openBrief(id,biz){
     +'<div class="pitch-ammo-title">&#x1F3AF; Pitch Ammo</div>'
     +pitchAmmoHtml
     +'</div></div>'
-    +'<div class="strat-iframe-wrap"><iframe id="stratIframe" srcdoc="'+csEsc+'" style="width:100%;height:100%;border:none"></iframe></div>'
+    +'<div class="strat-iframe-wrap"><iframe id="stratIframe" src="./QF_Sales_Call_Script.html" style="width:100%;height:100%;border:none" onload="var d=this.contentDocument;if(d){var s=d.createElement(\'style\');s.textContent=\'.sidebar{display:none!important}.main{margin-left:0!important;padding-left:32px!important;max-width:none!important}\';d.head.appendChild(s);}"></iframe></div>'
     +'</div></div>'
     // ── Modal
     +'<div class="modal-overlay" id="whyModal"><div class="modal-box"><button class="modal-close" onclick="closeWhyModal()">&#x2715;</button><div class="modal-title">&#x1F4A1; Why a Website Matters in 2026</div><div class="panel-body">'+anglesHtml+'</div></div></div>'

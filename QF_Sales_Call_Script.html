@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickFlip Sites — Sales Call Playbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111418;
+    --surface2: #181c22;
+    --surface3: #1e232b;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --muted2: #9ca3af;
+    --accent: #00e5a0;
+    --accent-dim: rgba(0,229,160,0.12);
+    --accent-dim2: rgba(0,229,160,0.06);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.1);
+    --blue: #60a5fa;
+    --blue-dim: rgba(96,165,250,0.1);
+    --purple: #a78bfa;
+    --purple-dim: rgba(167,139,250,0.1);
+    --phase-1: #00e5a0;
+    --phase-2: #60a5fa;
+    --phase-3: #f59e0b;
+    --phase-4: #a78bfa;
+    --phase-5: #ef4444;
+    --phase-6: #34d399;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  .shell {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 0.5px solid var(--border);
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    overflow-y: auto;
+    z-index: 100;
+  }
+
+  .sidebar-logo {
+    padding: 20px 20px 16px;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .sidebar-logo .wordmark {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 15px;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+  }
+
+  .sidebar-logo .sub {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .nav-section {
+    padding: 16px 12px 8px;
+  }
+
+  .nav-section-label {
+    font-size: 9px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 8px;
+    margin-bottom: 6px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--muted2);
+    transition: all 0.15s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    text-decoration: none;
+  }
+
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--accent-dim); color: var(--accent); }
+
+  .nav-phase-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  .nav-item .phase-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    width: 18px;
+    flex-shrink: 0;
+    color: var(--muted);
+  }
+
+  .nav-item.active .phase-num { color: inherit; }
+
+  /* ── Main ── */
+  .main {
+    margin-left: 240px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .topbar {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 14px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .topbar-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--text);
+  }
+
+  .topbar-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .content {
+    padding: 48px 40px;
+    max-width: 860px;
+  }
+
+  /* ── Sections ── */
+  .phase-block {
+    margin-bottom: 56px;
+  }
+
+  .phase-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .phase-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 4px 10px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    font-weight: 500;
+  }
+
+  .phase-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--text);
+  }
+
+  .phase-desc {
+    font-size: 13px;
+    color: var(--muted2);
+    margin-left: auto;
+    text-align: right;
+    font-style: italic;
+    max-width: 200px;
+    line-height: 1.4;
+  }
+
+  /* ── Script Cards ── */
+  .script-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .script-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .script-card-head:hover { background: var(--surface2); }
+
+  .script-card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .script-card-title {
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--text);
+    margin-top: 2px;
+  }
+
+  .script-card-toggle {
+    font-size: 18px;
+    color: var(--muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+
+  .script-card.open .script-card-toggle { transform: rotate(45deg); }
+
+  .script-card-body {
+    display: none;
+    padding: 20px;
+  }
+
+  .script-card.open .script-card-body { display: block; }
+
+  /* ── Speech Lines ── */
+  .say {
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 16px;
+    margin: 12px 0;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--text);
+    position: relative;
+  }
+
+  .say::before {
+    content: 'SAY';
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  .say.if-warm { border-left-color: var(--blue); }
+  .say.if-warm::before { content: 'IF THEY SAW DEMO'; color: var(--blue); }
+
+  .say.if-cold { border-left-color: var(--amber); }
+  .say.if-cold::before { content: 'IF COLD CALL'; color: var(--amber); }
+
+  .say.objection { border-left-color: var(--red); }
+  .say.objection::before { content: 'OBJECTION HANDLER'; color: var(--red); }
+
+  .say.close { border-left-color: var(--purple); }
+  .say.close::before { content: 'CLOSE'; color: var(--purple); }
+
+  .say.vcall { border-left-color: var(--phase-6); }
+  .say.vcall::before { content: 'VIDEO CALL BRIDGE'; color: var(--phase-6); }
+
+  /* ── Notes ── */
+  .note {
+    display: flex;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--accent-dim2);
+    border: 0.5px solid rgba(0,229,160,0.2);
+    border-radius: 8px;
+    margin: 10px 0;
+    font-size: 13px;
+    color: var(--muted2);
+    line-height: 1.6;
+  }
+
+  .note-icon { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
+
+  .note.warn {
+    background: var(--amber-dim);
+    border-color: rgba(245,158,11,0.25);
+  }
+
+  .note.info {
+    background: var(--blue-dim);
+    border-color: rgba(96,165,250,0.2);
+  }
+
+  /* ── Questions ── */
+  .q-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .q-list li {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 0.5px solid var(--border);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .q-list li:last-child { border-bottom: none; }
+
+  .q-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    flex-shrink: 0;
+    padding-top: 2px;
+    width: 22px;
+  }
+
+  .q-text { color: var(--text); }
+  .q-why { color: var(--muted2); font-size: 12px; margin-top: 3px; font-style: italic; }
+
+  /* ── Tags ── */
+  .tag {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.07em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .tag-green { background: var(--accent-dim); color: var(--accent); }
+  .tag-blue { background: var(--blue-dim); color: var(--blue); }
+  .tag-amber { background: var(--amber-dim); color: var(--amber); }
+  .tag-red { background: var(--red-dim); color: var(--red); }
+  .tag-purple { background: var(--purple-dim); color: var(--purple); }
+
+  /* ── Dividers ── */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+    color: var(--muted);
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 0.5px;
+    background: var(--border);
+  }
+
+  /* ── Scale Widget ── */
+  .scale-bar {
+    display: flex;
+    gap: 4px;
+    margin: 14px 0;
+  }
+
+  .scale-seg {
+    flex: 1;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    border: 0.5px solid transparent;
+  }
+
+  .scale-seg:hover { opacity: 0.8; }
+
+  .scale-hint {
+    padding: 12px 14px;
+    background: var(--surface3);
+    border-radius: 8px;
+    font-size: 13px;
+    min-height: 60px;
+    transition: all 0.2s;
+  }
+
+  .scale-hint-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  /* ── Objection accordion ── */
+  .obj-block {
+    border: 0.5px solid var(--border);
+    border-radius: 9px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+
+  .obj-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    background: var(--surface);
+    transition: background 0.15s;
+  }
+
+  .obj-head:hover { background: var(--surface2); }
+
+  .obj-tag { flex-shrink: 0; }
+
+  .obj-title {
+    font-size: 14px;
+    color: var(--text);
+    flex: 1;
+  }
+
+  .obj-arrow {
+    font-size: 16px;
+    color: var(--muted);
+    transition: transform 0.2s;
+  }
+
+  .obj-block.open .obj-arrow { transform: rotate(90deg); }
+
+  .obj-body {
+    display: none;
+    padding: 16px 20px;
+    background: var(--surface2);
+    border-top: 0.5px solid var(--border);
+  }
+
+  .obj-block.open .obj-body { display: block; }
+
+  /* ── Copy button ── */
+  .copy-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    padding: 4px 10px;
+    border-radius: 5px;
+    border: 0.5px solid var(--border2);
+    background: var(--surface3);
+    color: var(--muted2);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .copy-btn:hover { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+  /* ── Pipeline visual ── */
+  .pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 24px 0;
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .pipeline-step {
+    flex: 1;
+    padding: 14px 12px;
+    text-align: center;
+    border-right: 0.5px solid var(--border);
+    position: relative;
+  }
+
+  .pipeline-step:last-child { border-right: none; }
+
+  .pipeline-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+
+  .pipeline-label {
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  .pipeline-arrow {
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--bg);
+    padding: 2px;
+  }
+
+  /* ── Scroll ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .sidebar { width: 200px; }
+    .main { margin-left: 200px; }
+    .content { padding: 32px 24px; }
+    .topbar { padding: 14px 24px; }
+  }
+
+  /* ── Highlight ── */
+  em { color: var(--muted2); font-style: italic; }
+  strong { color: var(--text); font-weight: 500; }
+  .accent { color: var(--accent); }
+
+  /* ── Active Section highlight ── */
+  .phase-block.highlighted { scroll-margin-top: 80px; }
+
+  /* ── Mirror technique box ── */
+  .technique-box {
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+
+  .technique-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 12px 0;
+  }
+
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="wordmark">QuickFlip Sites</div>
+    <div class="sub">Sales Call Playbook v1.0</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-label">Overview</div>
+    <a class="nav-item active" onclick="scrollTo('overview')">
+      <span class="phase-num">—</span> Pipeline Overview
+    </a>
+    <a class="nav-item" onclick="scrollTo('brief')">
+      <span class="phase-num">—</span> Using the Brief
+    </a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-label">The Script</div>
+    <a class="nav-item" onclick="scrollTo('p1')">
+      <div class="nav-phase-dot" style="background: var(--phase-1);"></div> Open
+    </a>
+    <a class="nav-item" onclick="scrollTo('p2')">
+      <div class="nav-phase-dot" style="background: var(--phase-2);"></div> Discovery
+    </a>
+    <a class="nav-item" onclick="scrollTo('p3')">
+      <div class="nav-phase-dot" style="background: var(--phase-3);"></div> Deepen Pain
+    </a>
+    <a class="nav-item" onclick="scrollTo('p4')">
+      <div class="nav-phase-dot" style="background: var(--phase-4);"></div> The Reveal
+    </a>
+    <a class="nav-item" onclick="scrollTo('p5')">
+      <div class="nav-phase-dot" style="background: var(--phase-5);"></div> Commitment
+    </a>
+    <a class="nav-item" onclick="scrollTo('p6')">
+      <div class="nav-phase-dot" style="background: var(--phase-6);"></div> Close / Bridge
+    </a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-label">Handling</div>
+    <a class="nav-item" onclick="scrollTo('objections')">
+      <span class="phase-num">—</span> Objections
+    </a>
+    <a class="nav-item" onclick="scrollTo('techniques')">
+      <span class="phase-num">—</span> Techniques
+    </a>
+  </div>
+</nav>
+
+<!-- Main Content -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title">Sales Call Playbook — QuickFlip Sites</div>
+    <div class="topbar-meta">Cold Call → Video Call → Close</div>
+  </div>
+
+  <div class="content">
+
+    <!-- OVERVIEW -->
+    <div class="phase-block highlighted" id="overview">
+      <div class="phase-header">
+        <span class="phase-badge" style="background: rgba(255,255,255,0.05); color: var(--muted2);">PIPELINE</span>
+        <span class="phase-title">How the funnel works</span>
+      </div>
+
+      <div class="pipeline">
+        <div class="pipeline-step" style="background: var(--accent-dim2);">
+          <div class="pipeline-num">01</div>
+          <div class="pipeline-label" style="color: var(--accent);">Demo Drop</div>
+          <div style="font-size: 10px; color: var(--muted); margin-top: 3px;">Contact form DM</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipeline-num">02</div>
+          <div class="pipeline-label" style="color: var(--blue);">Demo Site</div>
+          <div style="font-size: 10px; color: var(--muted); margin-top: 3px;">15s popup: site for sale</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipeline-num">03</div>
+          <div class="pipeline-label" style="color: var(--amber);">Follow-up Call</div>
+          <div style="font-size: 10px; color: var(--muted); margin-top: 3px;">If no inbound reply</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipeline-num">04</div>
+          <div class="pipeline-label" style="color: var(--purple);">Video Call</div>
+          <div style="font-size: 10px; color: var(--muted); margin-top: 3px;">Close or qualify</div>
+        </div>
+        <div class="pipeline-step" style="background: var(--accent-dim2);">
+          <div class="pipeline-num">05</div>
+          <div class="pipeline-label" style="color: var(--accent);">Whop Checkout</div>
+          <div style="font-size: 10px; color: var(--muted); margin-top: 3px;">Send link, done</div>
+        </div>
+      </div>
+
+      <div class="note">
+        <span class="note-icon">🎯</span>
+        <span>The call has <strong>two valid exits</strong>: close on the spot (send Whop link), or lock in a video call. Either is a win. Never end a call in "I'll think about it" without a booked time.</span>
+      </div>
+
+      <div class="note info">
+        <span class="note-icon">💡</span>
+        <span><strong>Warm vs. Cold:</strong> If the prospect saw the demo popup, they already know a site exists and it's for sale. Skip the "built you a site" reveal — you're just following up. If they didn't see it or don't remember, the reveal is still your hook.</span>
+      </div>
+    </div>
+
+    <!-- USING THE BRIEF -->
+    <div class="phase-block highlighted" id="brief">
+      <div class="phase-header">
+        <span class="phase-badge" style="background: rgba(255,255,255,0.05); color: var(--muted2);">PREP</span>
+        <span class="phase-title">Using the Sales Brief</span>
+      </div>
+
+      <p style="color: var(--muted2); font-size: 14px; margin-bottom: 16px;">Before every call, open the prospect's brief in the dashboard. You don't pitch from it — you <em>listen for it</em>. Pull from the brief only when the prospect hands you the opening.</p>
+
+      <div class="two-col">
+        <div class="script-card" style="margin-bottom: 0;">
+          <div style="padding: 14px 16px;">
+            <div style="font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px;">Load before dialing</div>
+            <ul style="list-style: none; display: flex; flex-direction: column; gap: 8px;">
+              <li style="font-size: 13px; color: var(--muted2); display: flex; gap: 8px;"><span style="color: var(--accent);">→</span> Owner's first name + confidence</li>
+              <li style="font-size: 13px; color: var(--muted2); display: flex; gap: 8px;"><span style="color: var(--accent);">→</span> 1–2 standout review quotes</li>
+              <li style="font-size: 13px; color: var(--muted2); display: flex; gap: 8px;"><span style="color: var(--accent);">→</span> Top 2 competitor names</li>
+              <li style="font-size: 13px; color: var(--muted2); display: flex; gap: 8px;"><span style="color: var(--accent);">→</span> Their single biggest site gap (friction angle)</li>
+              <li style="font-size: 13px; color: var(--muted2); display: flex; gap: 8px;"><span style="color: var(--accent);">→</span> Two job value numbers (e.g. $3k–$8k repiping)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="script-card" style="margin-bottom: 0;">
+          <div style="padding: 14px 16px;">
+            <div style="font-family: 'DM Mono', monospace; font-size: 10px; color: var(--amber); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px;">Don't do this</div>
+            <ul style="list-style: none; display: flex; flex-direction: column; gap: 8px;">
+              <li style="font-size: 13px; color: var(--muted2); display: flex; gap: 8px;"><span style="color: var(--red);">✕</span> Recite every section in order</li>
+              <li style="font-size: 13px; color: var(--muted2); display: flex; gap: 8px;"><span style="color: var(--red);">✕</span> Lead with competitor names unprompted</li>
+              <li style="font-size: 13px; color: var(--muted2); display: flex; gap: 8px;"><span style="color: var(--red);">✕</span> Throw ROI math before they've talked</li>
+              <li style="font-size: 13px; color: var(--muted2); display: flex; gap: 8px;"><span style="color: var(--red);">✕</span> Read the brief notes verbatim on the call</li>
+              <li style="font-size: 13px; color: var(--muted2); display: flex; gap: 8px;"><span style="color: var(--red);">✕</span> Skip discovery and go straight to pitch</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 1: OPEN -->
+    <div class="phase-block highlighted" id="p1">
+      <div class="phase-header">
+        <span class="phase-badge" style="background: rgba(0,229,160,0.15); color: var(--phase-1);">PHASE 01</span>
+        <span class="phase-title">Open</span>
+        <span class="phase-desc">Get permission. Set the frame.</span>
+      </div>
+
+      <div class="note">
+        <span class="note-icon">📌</span>
+        <span>Your only goal in the open: get 60 seconds of permission. Don't pitch yet. Don't reveal everything. Just get them to agree to hear you out.</span>
+      </div>
+
+      <div class="script-card open">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--blue);">If they saw the demo</div>
+            <div class="script-card-title">Warm open — demo drop already sent</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <div class="say if-warm">
+            Hey [Name] — I actually messaged through your website a couple days ago. I found a site that looked like it might be yours and wanted to check if it was connected to [Business Name]. Did someone get a chance to see that link?
+          </div>
+          <div class="note info" style="margin-top: 8px;">
+            <span class="note-icon">💡</span>
+            <span><strong>If yes, saw it:</strong> "Great — that's actually why I'm calling. I built that. I want to talk to you about it. Do you have 60 seconds?"<br><strong>If no, didn't see it:</strong> Treat as cold — send them the link right now and pivot to the cold open script below.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="script-card">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--amber);">No prior contact</div>
+            <div class="script-card-title">Cold open — calling fresh</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <div class="say if-cold">
+            Hey [Name], my name is [Your Name] — I'm not a customer, I'll be upfront about that. I actually built a website for [Business Name] this week, and I wanted to show it to you before I moved on to someone else in the area. Do you have 60 seconds?
+          </div>
+          <div class="note warn" style="margin-top: 8px;">
+            <span class="note-icon">⚠️</span>
+            <span>Don't say "I'm a web designer" or "I'm calling about your website." Lead with the already-built fact — it's the hook. Their curiosity is your entry point.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="script-card">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--muted);">Gatekeeper</div>
+            <div class="script-card-title">Getting past staff / receptionist</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <div class="say">
+            Hey — is [Owner Name / the owner] available? It's [Your Name] — I have something for them, not a sales call.
+          </div>
+          <div class="note" style="margin-top: 8px;">
+            <span class="note-icon">💡</span>
+            <span>"I have something for them" is technically true and creates curiosity without being deceptive. If pressed: "I built a website for [Business Name] and want to show it to the owner before I offer it to someone else."</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 2: DISCOVERY -->
+    <div class="phase-block highlighted" id="p2">
+      <div class="phase-header">
+        <span class="phase-badge" style="background: rgba(96,165,250,0.12); color: var(--phase-2);">PHASE 02</span>
+        <span class="phase-title">Discovery</span>
+        <span class="phase-desc">Ask questions. Let them talk.</span>
+      </div>
+
+      <div class="note">
+        <span class="note-icon">🎙️</span>
+        <span>This is where most reps fail — they skip straight to the pitch. Don't. The discovery questions are what make the prospect <strong>sell themselves</strong>. Your job here is to listen and mirror, not talk.</span>
+      </div>
+
+      <div class="script-card open">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--phase-2);">Current situation</div>
+            <div class="script-card-title">Understand where they get business today</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <p style="font-size: 13px; color: var(--muted2); margin-bottom: 12px;">These questions build the picture. Ask them in a relaxed, curious tone — not an interrogation. One at a time. Let them finish.</p>
+
+          <ul class="q-list">
+            <li>
+              <span class="q-num">Q1</span>
+              <div>
+                <div class="q-text">So how does most of your work come in right now — is it mostly referrals, or are you getting people finding you online?</div>
+                <div class="q-why">This tells you if they're referral-dependent or already have some search traffic. Referral-only = they're leaving money on the table and know it.</div>
+              </div>
+            </li>
+            <li>
+              <span class="q-num">Q2</span>
+              <div>
+                <div class="q-text">And when someone does find you online — what do you think they see first? Google, Yelp, your site?</div>
+                <div class="q-why">Gets them thinking about their own digital presence without you having to tell them it's weak.</div>
+              </div>
+            </li>
+            <li>
+              <span class="q-num">Q3</span>
+              <div>
+                <div class="q-text">How's business been lately — are you at capacity, or is there room for more work?</div>
+                <div class="q-why">If they're slow, this opens the "you could be filling that gap" angle. If they're busy, pivot to quality over quantity — bigger jobs, not more jobs.</div>
+              </div>
+            </li>
+            <li>
+              <span class="q-num">Q4</span>
+              <div>
+                <div class="q-text">What kind of jobs do you love doing — the ones you wish you got more of?</div>
+                <div class="q-why">Gold. They'll name the high-ticket jobs (repiping, full installs, boiler replacements). Now you know exactly what the site should be built around.</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="script-card">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--phase-2);">Current site</div>
+            <div class="script-card-title">Get them to evaluate their own web presence</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <ul class="q-list">
+            <li>
+              <span class="q-num">Q5</span>
+              <div>
+                <div class="q-text">How do you feel about your current website — does it represent the business the way you'd want a potential customer to see it?</div>
+                <div class="q-why">Most will say "it's fine" or "it's okay, I guess." The hesitation is the tell. Don't jump on it — mirror it back.</div>
+              </div>
+            </li>
+            <li>
+              <span class="q-num">Q6</span>
+              <div>
+                <div class="q-text">If a homeowner in [neighborhood] searched for [trade] right now — do you think they'd find you?</div>
+                <div class="q-why">Concrete and specific. Forces them to think about the actual search. Most trade owners have no idea how they rank.</div>
+              </div>
+            </li>
+          </ul>
+
+          <div class="technique-box" style="margin-top: 14px;">
+            <div class="technique-label" style="color: var(--purple);">Mirror technique</div>
+            <div style="color: var(--muted2); font-size: 13px;">If they say <em>"It's okay I guess, it's a bit outdated"</em> — just repeat the last two or three words back as a question: <strong>"A bit outdated?"</strong> Then stay silent. They'll fill the silence with more. This is mirroring — it works because it feels like you're listening, not selling.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 3: DEEPEN PAIN -->
+    <div class="phase-block highlighted" id="p3">
+      <div class="phase-header">
+        <span class="phase-badge" style="background: rgba(245,158,11,0.12); color: var(--phase-3);">PHASE 03</span>
+        <span class="phase-title">Deepen the pain</span>
+        <span class="phase-desc">Consequence questions. Let them feel the gap.</span>
+      </div>
+
+      <div class="note">
+        <span class="note-icon">🔍</span>
+        <span>Only go here if discovery revealed a real problem — slow periods, referral dependency, uncertainty about search presence, or frustration with the current site. Don't manufacture pain that isn't there.</span>
+      </div>
+
+      <div class="script-card open">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--phase-3);">Consequence questions</div>
+            <div class="script-card-title">What does the gap actually cost them?</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <ul class="q-list">
+            <li>
+              <span class="q-num">Q7</span>
+              <div>
+                <div class="q-text">So if a homeowner on [street / neighborhood] is searching right now for someone to handle [the job they said they love] — and they don't see your name — where do you think that call goes?</div>
+                <div class="q-why">Paints the picture of lost revenue without you stating a number. They'll say "probably one of the bigger guys" or name a competitor.</div>
+              </div>
+            </li>
+            <li>
+              <span class="q-num">Q8</span>
+              <div>
+                <div class="q-text">What's a job like that worth to you — roughly?</div>
+                <div class="q-why">Let them say the number. A $5,000 job means more coming from them than from you. Note it for the ROI close later.</div>
+              </div>
+            </li>
+            <li>
+              <span class="q-num">Q9</span>
+              <div>
+                <div class="q-text">And how many of those could you realistically take on in a month if they were coming in?</div>
+                <div class="q-why">Now they're doing the math themselves. You don't have to.</div>
+              </div>
+            </li>
+          </ul>
+
+          <div class="divider">then</div>
+
+          <div class="say">
+            So just to make sure I'm hearing this right — if nothing changes here, those jobs keep going to someone else. Is that something you're okay with, or is that actually worth fixing?
+          </div>
+
+          <div class="note" style="margin-top: 10px;">
+            <span class="note-icon">📌</span>
+            <span>The question "Is that something you're okay with?" forces a real answer. "No" means you proceed. "Yes" means you probe further — they're hiding something or genuinely aren't the decision maker.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="script-card">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--phase-3);">If they say they're busy / don't need more work</div>
+            <div class="script-card-title">Pivot to quality over quantity</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <div class="say">
+            That's actually great to hear — 25 years in the area, you've built something real. I'm not trying to flood you with calls. What I'm asking is this: are the jobs you're getting right now the ones you actually want? Because the customers in [neighborhood] who have the $1.3 million homes — they're searching online first. That's the market we're talking about. Not more work. Better work.
+          </div>
+          <div class="technique-box" style="margin-top: 14px;">
+            <div class="technique-label" style="color: var(--purple);">Reframe technique</div>
+            <div style="color: var(--muted2); font-size: 13px;">Shift from "volume" to "quality of client." Trade owners who are busy often have plenty of small, low-margin jobs and few big ones. The reframe targets their ambition, not their availability.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 4: THE REVEAL -->
+    <div class="phase-block highlighted" id="p4">
+      <div class="phase-header">
+        <span class="phase-badge" style="background: rgba(167,139,250,0.12); color: var(--phase-4);">PHASE 04</span>
+        <span class="phase-title">The reveal</span>
+        <span class="phase-desc">Show them what exists. Don't oversell it.</span>
+      </div>
+
+      <div class="note">
+        <span class="note-icon">🎯</span>
+        <span>The reveal is earned — it lands harder because you just spent 5 minutes understanding their situation. Now you bridge directly from their pain to the solution.</span>
+      </div>
+
+      <div class="script-card open">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--phase-4);">The bridge</div>
+            <div class="script-card-title">Connect what they said to what you built</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <div class="say">
+            Here's why I'm actually calling. I noticed exactly what you described — [use their friction angle from the brief, e.g., "there was no way to see your services clearly" / "I couldn't find an emergency line" / "the site didn't show off the work you do"]. So I built a version that does. I'm not asking you to pay for anything right now. I just want you to look at it for 30 seconds. Can I text you the link?
+          </div>
+
+          <div class="note" style="margin-top: 10px;">
+            <span class="note-icon">💡</span>
+            <span>Insert the friction angle from their brief — the one specific thing you actually observed on their site (Angle A, B, or C). This makes it feel personal and accurate, not generic.</span>
+          </div>
+
+          <div class="divider">after they agree to receive the link</div>
+
+          <div class="say">
+            Okay I just sent it. Take a look while I've got you — I can walk you through it in 60 seconds if you want, or just tell me what you think when you open it.
+          </div>
+        </div>
+      </div>
+
+      <div class="script-card">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--phase-4);">Talking points</div>
+            <div class="script-card-title">What to say while they're looking at the site</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <p style="font-size: 13px; color: var(--muted2); margin-bottom: 12px;">While they're looking, use material from the brief to anchor the value. Only use one or two of these — not all of them.</p>
+
+          <ul class="q-list">
+            <li>
+              <span class="q-num">★</span>
+              <div>
+                <div class="q-text">Your reviews use the word "punctual" more than any plumber I've seen. The site surfaces that front and center — because that's actually what sets you apart in this market.</div>
+              </div>
+            </li>
+            <li>
+              <span class="q-num">★</span>
+              <div>
+                <div class="q-text">You've been in [neighborhood] for 25 years. That's longer than most of your competitors have had a web presence here. The site leads with that — because that history is actually a weapon if it shows up correctly.</div>
+              </div>
+            </li>
+            <li>
+              <span class="q-num">★</span>
+              <div>
+                <div class="q-text">The page is built around [high-value service they mentioned in discovery] — so when someone searches for that specific job, there's a page for it. Your current site doesn't have that.</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 5: COMMITMENT -->
+    <div class="phase-block highlighted" id="p5">
+      <div class="phase-header">
+        <span class="phase-badge" style="background: rgba(239,68,68,0.1); color: var(--phase-5);">PHASE 05</span>
+        <span class="phase-title">Gain commitment</span>
+        <span class="phase-desc">Temperature check. Stack the yes.</span>
+      </div>
+
+      <div class="note">
+        <span class="note-icon">🌡️</span>
+        <span>After they've seen the site, get a temperature read before you talk price or logistics. This surfaces hidden objections early and tells you how to close.</span>
+      </div>
+
+      <div class="script-card open">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--phase-5);">Temperature check</div>
+            <div class="script-card-title">The 1–10 scale</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <div class="say">
+            On a scale of 1 to 10 — 1 being "this isn't for me," 10 being "I want this live today" — where do you honestly sit right now?
+          </div>
+
+          <!-- Scale widget -->
+          <div style="margin: 16px 0;">
+            <div class="scale-bar" id="scaleBar">
+              <div class="scale-seg" style="background: #2d1a1a; color: #ef4444; border-color: rgba(239,68,68,0.2);" onclick="setScale(1)">1</div>
+              <div class="scale-seg" style="background: #2d1a1a; color: #ef4444; border-color: rgba(239,68,68,0.2);" onclick="setScale(2)">2</div>
+              <div class="scale-seg" style="background: #2a1f10; color: #f59e0b; border-color: rgba(245,158,11,0.2);" onclick="setScale(3)">3</div>
+              <div class="scale-seg" style="background: #2a1f10; color: #f59e0b; border-color: rgba(245,158,11,0.2);" onclick="setScale(4)">4</div>
+              <div class="scale-seg" style="background: #2a2010; color: #f59e0b; border-color: rgba(245,158,11,0.2);" onclick="setScale(5)">5</div>
+              <div class="scale-seg" style="background: #1a2a1a; color: #34d399; border-color: rgba(52,211,153,0.2);" onclick="setScale(6)">6</div>
+              <div class="scale-seg" style="background: #1a2a1a; color: #34d399; border-color: rgba(52,211,153,0.2);" onclick="setScale(7)">7</div>
+              <div class="scale-seg" style="background: #102a1e; color: #00e5a0; border-color: rgba(0,229,160,0.2);" onclick="setScale(8)">8</div>
+              <div class="scale-seg" style="background: #102a1e; color: #00e5a0; border-color: rgba(0,229,160,0.2);" onclick="setScale(9)">9</div>
+              <div class="scale-seg" style="background: #102a1e; color: #00e5a0; border-color: rgba(0,229,160,0.25);" onclick="setScale(10)">10</div>
+            </div>
+            <div class="scale-hint" id="scaleHint">
+              <div class="scale-hint-label" style="color: var(--muted);">Click a number to see the response</div>
+              <div id="scaleText" style="color: var(--muted2); font-size: 13px;">What response do you get?</div>
+            </div>
+          </div>
+
+          <div class="note" style="margin-top: 0;">
+            <span class="note-icon">📌</span>
+            <span>Never accept "I'll think about it" without asking what specifically is holding them back. Vague resistance = hidden objection. Dig for it.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="script-card">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--phase-5);">Isolate the block</div>
+            <div class="script-card-title">What's keeping them from a 10?</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <div class="say">
+            Got it — and I appreciate you being straight with me. What specifically do you think is keeping you from a [higher number]? Is it the price, or is there something about the site itself that isn't quite right yet?
+          </div>
+          <p style="font-size: 13px; color: var(--muted2); margin-top: 12px; margin-bottom: 8px;">Listen to their answer. Then ask one more:</p>
+          <div class="say">
+            If that were resolved — would this be a yes?
+          </div>
+          <div class="note" style="margin-top: 10px;">
+            <span class="note-icon">💡</span>
+            <span>This question is critical. "If that were resolved — would this be a yes?" collapses the objection into a single resolvable condition. If they say yes, you solve the condition. If they keep moving the goalposts, there's a deeper issue — likely price, authority, or they're not the decision maker.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 6: CLOSE / BRIDGE -->
+    <div class="phase-block highlighted" id="p6">
+      <div class="phase-header">
+        <span class="phase-badge" style="background: rgba(52,211,153,0.1); color: var(--phase-6);">PHASE 06</span>
+        <span class="phase-title">Close or bridge to video call</span>
+        <span class="phase-desc">Two valid wins. Lock in one.</span>
+      </div>
+
+      <div class="note">
+        <span class="note-icon">🔀</span>
+        <span>Read the prospect. If they're high-energy and engaged, push for the close now. If they're analytical or hesitant, the video call is your friend — it's where you share your screen, show them their competitors' rankings, and close with data. Either way, don't leave the call without a commitment.</span>
+      </div>
+
+      <div class="script-card open">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--accent);">Path A</div>
+            <div class="script-card-title">Close on the call — send Whop link now</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <div class="say close">
+            Here's how it works — I'll send you a checkout link right now, it takes about two minutes. Once that's done, we handle everything: hosting, domain, going live. You don't touch a thing. Want me to send it over?
+          </div>
+
+          <div class="divider">if they say yes</div>
+
+          <div class="say close">
+            Perfect. I'm sending it now — keep an eye on [email / phone]. Once you complete it I'll get confirmation and we'll have everything set up within 24 hours. Any questions before I send?
+          </div>
+
+          <div class="note" style="margin-top: 10px;">
+            <span class="note-icon">📌</span>
+            <span>Send the Whop checkout link immediately. Do not let the call end and then send it — the window closes fast. Stay on with them if possible until they complete it.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="script-card">
+        <div class="script-card-head" onclick="toggleCard(this)">
+          <div>
+            <div class="script-card-label" style="color: var(--phase-6);">Path B</div>
+            <div class="script-card-title">Bridge to video call — close with data</div>
+          </div>
+          <span class="script-card-toggle">+</span>
+        </div>
+        <div class="script-card-body">
+          <div class="say vcall">
+            I want to be respectful of your time — I think the best thing I can do is jump on a quick video call with you, probably 15–20 minutes. I'll show you exactly where you stand on Google right now, where your competitors are ranking, and what the site does differently. That way you've got the full picture before you decide anything. Are you free [day] or [day] this week?
+          </div>
+
+          <div class="note" style="margin-top: 10px;">
+            <span class="note-icon">💡</span>
+            <span>Give two specific day options — not "when works for you." Open-ended scheduling creates friction and delays. Lock in a time before you hang up.</span>
+          </div>
+
+          <div class="divider">after they pick a time</div>
+
+          <div class="say vcall">
+            Perfect — I'll send you a calendar invite with the video link in the next few minutes. And in the meantime, the demo site link is [URL] if you want to poke around again before we talk. Sound good?
+          </div>
+
+          <div class="note warn" style="margin-top: 10px;">
+            <span class="note-icon">⚠️</span>
+            <span>Send the calendar invite <strong>while they're still on the call</strong> if possible, or within 5 minutes of hanging up. A booked call with no invite is a 40% no-show rate. An invite with a link drops that significantly.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OBJECTIONS -->
+    <div class="phase-block highlighted" id="objections">
+      <div class="phase-header">
+        <span class="phase-badge" style="background: rgba(239,68,68,0.1); color: var(--red);">OBJECTIONS</span>
+        <span class="phase-title">Handling resistance</span>
+        <span class="phase-desc">Every objection is a question in disguise.</span>
+      </div>
+
+      <p style="color: var(--muted2); font-size: 14px; margin-bottom: 20px;">Trade owners are skeptical by nature — they get pitched constantly. An objection isn't a no, it's a "convince me." Click each one to see the response.</p>
+
+      <!-- Objection blocks -->
+      <div class="obj-block open">
+        <div class="obj-head" onclick="toggleObj(this)">
+          <span class="tag tag-amber obj-tag">COMMON</span>
+          <span class="obj-title">"I already have a website."</span>
+          <span class="obj-arrow">›</span>
+        </div>
+        <div class="obj-body">
+          <div class="say objection">
+            I know — I've seen it. This isn't about replacing it, it's about showing you what the same business looks like with a site built specifically for how customers search in [neighborhood] today. It took me about an hour to put together. I'm not asking you to do anything right now — just look at it for 30 seconds. Want me to text you the link?
+          </div>
+          <div class="note" style="margin-top: 10px;">
+            <span class="note-icon">📌</span>
+            <span>Never criticize their current site directly. Frame yours as "what's possible" not "what's wrong with yours." If they push back further: <em>"What specifically do you like about your current site?"</em> — then show how yours has all of that plus more.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="obj-block">
+        <div class="obj-head" onclick="toggleObj(this)">
+          <span class="tag tag-amber obj-tag">COMMON</span>
+          <span class="obj-title">"I get enough work already."</span>
+          <span class="obj-arrow">›</span>
+        </div>
+        <div class="obj-body">
+          <div class="say objection">
+            That's a good position to be in — seriously. But here's the thing: the work you're getting is mostly referrals, which have a ceiling. I'm talking about a different kind of customer. In [neighborhood], there are homeowners sitting on $1.3 million properties looking for someone to handle [high-value job they mentioned]. That call goes to whoever shows up first on Google. Right now that's not you — and those jobs don't come through word of mouth.
+          </div>
+        </div>
+      </div>
+
+      <div class="obj-block">
+        <div class="obj-head" onclick="toggleObj(this)">
+          <span class="tag tag-red obj-tag">PRICE</span>
+          <span class="obj-title">"How much is it?"</span>
+          <span class="obj-arrow">›</span>
+        </div>
+        <div class="obj-body">
+          <div class="say objection">
+            Before I get into that — I want to make sure what I built actually makes sense for your business first. Have you had a chance to see the link? … [If yes]: Okay good. One job — one repiping, one boiler replacement — covers this and then some. The price is going to feel like nothing compared to that. Want me to walk you through it?
+          </div>
+          <div class="note" style="margin-top: 10px;">
+            <span class="note-icon">💡</span>
+            <span>Never give the price before they've seen the demo. If they haven't seen it, send it first and get them on video before you talk numbers. Price without context always loses.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="obj-block">
+        <div class="obj-head" onclick="toggleObj(this)">
+          <span class="tag tag-red obj-tag">PRICE</span>
+          <span class="obj-title">"That's too expensive."</span>
+          <span class="obj-arrow">›</span>
+        </div>
+        <div class="obj-body">
+          <div class="say objection">
+            I hear you. Let me just ask — what's a job like [high-value job they mentioned] worth to you on a good week? … [Let them answer.] Right. So we're talking about one customer — one call that you're not getting right now — covering this completely. That's not really an expense, that's the site paying for itself before the first month is up.
+          </div>
+        </div>
+      </div>
+
+      <div class="obj-block">
+        <div class="obj-head" onclick="toggleObj(this)">
+          <span class="tag tag-blue obj-tag">DELAY</span>
+          <span class="obj-title">"I need to think about it."</span>
+          <span class="obj-arrow">›</span>
+        </div>
+        <div class="obj-body">
+          <div class="say objection">
+            Of course — I wouldn't expect you to decide on the spot. Can I ask though: what specifically do you want to think through? Because if it's something I can clear up right now, I'd rather do that than leave you with an open question.
+          </div>
+          <div class="note" style="margin-top: 10px;">
+            <span class="note-icon">📌</span>
+            <span>The goal isn't to pressure them — it's to isolate the real concern. If they name it, handle it. If they can't name it, that's a sign they're not the decision maker or need the video call to feel confident.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="obj-block">
+        <div class="obj-head" onclick="toggleObj(this)">
+          <span class="tag tag-blue obj-tag">DELAY</span>
+          <span class="obj-title">"Call me back next week."</span>
+          <span class="obj-arrow">›</span>
+        </div>
+        <div class="obj-body">
+          <div class="say objection">
+            No problem at all — I just want to make sure the site is still available when I do. I'm talking to a couple other [trade] businesses in the area and I haven't made any decisions yet. Can we lock in a specific time? I'd rather block it for you than have that conversation after it's gone.
+          </div>
+          <div class="note" style="margin-top: 10px;">
+            <span class="note-icon">💡</span>
+            <span>This is true — you do have other leads in the area. The scarcity isn't manufactured. Use it honestly. Book a specific time, not an open "call me back."</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="obj-block">
+        <div class="obj-head" onclick="toggleObj(this)">
+          <span class="tag tag-purple obj-tag">AUTHORITY</span>
+          <span class="obj-title">"I'd have to talk to my wife / partner / accountant."</span>
+          <span class="obj-arrow">›</span>
+        </div>
+        <div class="obj-body">
+          <div class="say objection">
+            Totally understand — and honestly, I'd rather you have the full picture before you make any decision. Can we set up a quick call with the two of you? Even 15 minutes. That way whoever needs to see it, sees it at the same time and you're not playing middleman. What does [partner's] schedule look like this week?
+          </div>
+          <div class="note" style="margin-top: 10px;">
+            <span class="note-icon">📌</span>
+            <span>Never ask them to "explain it" to their partner — you lose control of the pitch. Always get the decision maker on a call directly, even if it takes another step.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="obj-block">
+        <div class="obj-head" onclick="toggleObj(this)">
+          <span class="tag tag-amber obj-tag">SKEPTIC</span>
+          <span class="obj-title">"How do I know this will actually get me customers?"</span>
+          <span class="obj-arrow">›</span>
+        </div>
+        <div class="obj-body">
+          <div class="say objection">
+            That's a fair question and I'm not going to promise you a specific number of leads — nobody can do that honestly. What I can show you is where [Competitor A] and [Competitor B] are ranking for searches in your area right now, and what they've built to get there. The difference between your current site and theirs is exactly the gap we're closing. Want to see that side by side on a quick video call?
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TECHNIQUES -->
+    <div class="phase-block highlighted" id="techniques">
+      <div class="phase-header">
+        <span class="phase-badge" style="background: var(--purple-dim); color: var(--purple);">TECHNIQUES</span>
+        <span class="phase-title">Core sales methods</span>
+        <span class="phase-desc">The psychology behind the script.</span>
+      </div>
+
+      <div class="two-col">
+        <div class="technique-box">
+          <div class="technique-label" style="color: var(--blue);">Mirroring</div>
+          <div style="color: var(--muted2); font-size: 13px; line-height: 1.7;">Repeat the last 2–3 words they said as a question. Creates the feeling of being heard. Draws out more detail without asking another question. <em>Silence after the mirror is the key — wait for them to fill it.</em></div>
+        </div>
+        <div class="technique-box">
+          <div class="technique-label" style="color: var(--accent);">Labeling</div>
+          <div style="color: var(--muted2); font-size: 13px; line-height: 1.7;">Name what they seem to be feeling: <em>"It sounds like you've had a bad experience with this kind of thing before."</em> Labels defuse resistance. They'll either confirm it (opening the door) or correct it (giving you the real objection).</div>
+        </div>
+        <div class="technique-box">
+          <div class="technique-label" style="color: var(--amber);">Consequence questions</div>
+          <div style="color: var(--muted2); font-size: 13px; line-height: 1.7;">Ask what happens if nothing changes. <em>"If you're in the same position six months from now — same site, same referral-only flow — what does that look like?"</em> Gets them to articulate the cost themselves.</div>
+        </div>
+        <div class="technique-box">
+          <div class="technique-label" style="color: var(--red);">Reframing</div>
+          <div style="color: var(--muted2); font-size: 13px; line-height: 1.7;">When they raise price as an objection, reframe against the job value they told you. Never defend the price — make the comparison do the work. <em>"You said a repiping runs $5k. This is less than that."</em></div>
+        </div>
+        <div class="technique-box">
+          <div class="technique-label" style="color: var(--purple);">The 1–10 close</div>
+          <div style="color: var(--muted2); font-size: 13px; line-height: 1.7;">Get a number before you talk price or logistics. A 7 tells you there's a specific objection. A 9 tells you you're close. Anything below 6 means go back to discovery — the pain isn't landed yet.</div>
+        </div>
+        <div class="technique-box">
+          <div class="technique-label" style="color: var(--phase-6);">Two-option close</div>
+          <div style="color: var(--muted2); font-size: 13px; line-height: 1.7;">Never ask an open question at the close. <em>"Are you free Tuesday or Wednesday?"</em> Both options move things forward. Open-ended ("when are you free?") creates friction and delays.</div>
+        </div>
+      </div>
+
+      <div class="note warn" style="margin-top: 24px;">
+        <span class="note-icon">⚠️</span>
+        <span><strong>The most important rule:</strong> The brief is intelligence, not a script. Use it to confirm what you hear from them — not to lead with. If they tell you they love doing boiler replacements, that's when you pull the ROI numbers. If they don't bring it up, you don't either.</span>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<script>
+  function toggleCard(head) {
+    const card = head.closest('.script-card');
+    card.classList.toggle('open');
+  }
+
+  function toggleObj(head) {
+    const block = head.closest('.obj-block');
+    block.classList.toggle('open');
+  }
+
+  function scrollTo(id) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const sectionMap = {
+      overview: 0, brief: 1, p1: 3, p2: 4, p3: 5, p4: 6, p5: 7, p6: 8, objections: 10, techniques: 11
+    };
+    const items = document.querySelectorAll('.nav-item');
+    if (sectionMap[id] !== undefined && items[sectionMap[id]]) {
+      items[sectionMap[id]].classList.add('active');
+    }
+  }
+
+  const scaleData = {
+    1: { color: '#ef4444', label: 'Hard no', text: 'Don\'t push. Acknowledge: "Totally fair — can I ask, is there something specific about it that\'s not a fit, or just not the right time?" If they have a real reason, address it. If it\'s vague, disengage and follow up in 30 days.' },
+    2: { color: '#ef4444', label: 'Hard no', text: 'Same as 1. Don\'t try to overcome this by talking more. The more you push a 2, the more firm it becomes. Ask one question, listen, and exit gracefully.' },
+    3: { color: '#f59e0b', label: 'Not landed yet', text: 'The pain isn\'t real enough yet. Go back to consequences: "What would it mean if you could actually capture the jobs that are going to [Competitor]?" Get them thinking about cost before you progress.' },
+    4: { color: '#f59e0b', label: 'Not landed yet', text: 'Similar to 3. There\'s interest but the value isn\'t clear. Ask: "What would make this a 7 for you?" Then solve for exactly that thing.' },
+    5: { color: '#f59e0b', label: 'Sitting on the fence', text: '"What\'s keeping you at a 5?" — make them name the specific thing. Then handle that one objection and re-temperature-check.' },
+    6: { color: '#34d399', label: 'Interested, not ready', text: 'Good sign — there\'s genuine interest. This is your video call candidate. "Sounds like you\'re close — let\'s get on a quick 15-minute video call so I can show you the SEO side of this and answer your questions properly."' },
+    7: { color: '#34d399', label: 'Real interest', text: '"What\'s keeping you from an 8?" Isolate the single remaining objection. Handle it, then ask: "If that were sorted — are we at a 9?" Stack the yes before asking for the decision.' },
+    8: { color: '#00e5a0', label: 'Ready to move', text: '"Great — what do you need to feel fully confident about this?" Handle whatever they raise, then go straight to the close: "Want me to send you the link now so we can get the ball rolling?"' },
+    9: { color: '#00e5a0', label: 'Ready to close', text: 'Don\'t oversell it. "Sounds like you\'re there — should we just get it set up?" Send the Whop link. Stay on the call until they complete it if possible.' },
+    10: { color: '#00e5a0', label: 'Yes — close now', text: 'Send the link immediately. "Let\'s get it done right now while I\'ve got you — I\'m sending the checkout link over now." Don\'t ask any more questions. Move to close.' }
+  };
+
+  function setScale(n) {
+    const d = scaleData[n];
+    document.getElementById('scaleHint').style.borderLeft = '3px solid ' + d.color;
+    document.getElementById('scaleHint').style.borderRadius = '0 8px 8px 0';
+    document.getElementById('scaleHint').style.paddingLeft = '14px';
+    document.querySelector('#scaleHint .scale-hint-label').style.color = d.color;
+    document.querySelector('#scaleHint .scale-hint-label').textContent = n + ' — ' + d.label;
+    document.getElementById('scaleText').textContent = d.text;
+
+    document.querySelectorAll('.scale-seg').forEach((seg, i) => {
+      seg.style.opacity = (i + 1 === n) ? '1' : '0.5';
+      seg.style.transform = (i + 1 === n) ? 'scaleY(1.15)' : '';
+    });
+  }
+</script>
+</body>
+</html>
