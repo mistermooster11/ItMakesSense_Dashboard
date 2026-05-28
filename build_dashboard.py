@@ -834,6 +834,8 @@ function openBrief(id,biz){
   const isJobMixFmt=topJobsRaw.indexOf('Signal Strength')>-1;
   const topJobRepNote=topJobsRaw.match(/>\s*💡\s*\*\*Rep note[^*]*\*\*[:\s]*(.*)/i);
   const topJobNote=topJobRepNote?topJobRepNote[1].trim():'';
+  const topJobReviewM=topJobsRaw.match(/📝\s*\*?Review mentions[^:]*:\s*([^\n*]+)\*?/i);
+  const topJobReviews=topJobReviewM?topJobReviewM[1].trim():'';
   // "The gap" text from brief competitive landscape
   const compGapM=compLandRaw.match(/\*\*The gap:\*\*([\s\S]*?)(?:\n\n|$)/i);
   const compGap=compGapM?compGapM[1].trim():'';
@@ -1052,7 +1054,13 @@ function openBrief(id,biz){
       if(!name||name==='#') return;
       html+='<div class="job-val-row"><span class="job-val-label">'+esc(name)+'</span><span class="job-val-amount">'+esc(val)+'</span></div>';
     });
-    if(topJobNote) html+='<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,212,255,.07);font-size:11px;color:#4a7080;line-height:1.5;font-style:italic">💡 '+esc(topJobNote)+'</div>';
+    if(topJobReviews&&topJobReviews.toLowerCase().indexOf('n/a')===-1){
+      html+='<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,212,255,.07);font-size:11px;color:#3a7080;line-height:1.6">';
+      html+='<span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#2a5060">📝 Review Mentions</span><br>';
+      html+='<span style="color:#5a9090">'+esc(topJobReviews)+'</span>';
+      html+='</div>';
+    }
+    if(topJobNote) html+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,212,255,.07);font-size:11px;color:#4a7080;line-height:1.5;font-style:italic">💡 '+esc(topJobNote)+'</div>';
     return html||'<div style="color:#2a4060;font-size:12px">See brief for job values</div>';
   })();
   // ── Strategy left nav ──────────────────────────────────────────────────────
