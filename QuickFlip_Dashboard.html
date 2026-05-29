@@ -687,6 +687,18 @@ function openBrief(id,biz){
     return ps;
   }
   // Build War Room HTML: pain/solution side-by-side grid + hooks + reviews
+  // Convert a prose pain block into ≤3 punchy bullet points
+  function bulletify(text){
+    if(!text) return text;
+    // Already bulleted (AI visibility items) — leave alone
+    if(/^\s*[-*]/.test(text)||text.indexOf('\n-')>-1) return text;
+    // Split on sentence boundaries: ". Capital" or " — Capital"
+    var parts=text.replace(/([.!?])\s+([A-Z])/g,'$1\n$2').replace(/\s+—\s+([A-Z])/g,'\n$1').split('\n');
+    parts=parts.map(function(s){return s.trim();}).filter(function(s){return s.length>12;});
+    if(parts.length===0) return '- '+text.trim();
+    // Take first 3 meaningful sentences
+    return parts.slice(0,3).map(function(s){return '- '+s;}).join('\n');
+  }
   function buildWarRoom(painSolutions,hooks,reviewItems){
     const colHead='font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:8px 18px;';
     let html='<div style="background:linear-gradient(180deg,rgba(248,113,113,.04),rgba(13,21,40,.7));border:2px solid rgba(248,113,113,.2);border-radius:4px;margin-bottom:20px;overflow:hidden">';
@@ -716,7 +728,7 @@ function openBrief(id,biz){
         html+='<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+dotC+';flex-shrink:0"></span>';
         html+='<span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:'+titleC+'">'+esc(item.title)+'</span>';
         html+='</div>';
-        html+='<div style="font-size:13px;color:'+textC+';line-height:1.7" class="md-pain">'+m(item.text)+'</div>';
+        html+='<div style="font-size:13px;color:'+textC+';line-height:1.7" class="md-pain">'+m(bulletify(item.text))+'</div>';
         html+='</div>';
         // RIGHT — Our Fix
         html+='<div style="padding:14px 18px;background:rgba(0,255,157,.03)">';
