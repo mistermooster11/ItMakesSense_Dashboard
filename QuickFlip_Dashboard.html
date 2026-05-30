@@ -633,16 +633,17 @@ function openBrief(id,biz){
   const hookRx=[...callScriptRaw.matchAll(/\*\*(Hook \d[^\*]+)\*\*[^\n]*\n>(.*)/g)];
   const pitchHooks=hookRx.slice(0,3).map(function(hm){return{label:hm[1].trim(),text:hm[2].trim()};});
   // Why a Site? — custom sales copy (bold=yellow standout, italic=green takeaway)
-  const B='<strong style="color:#f5c400;font-weight:700">';const BE='<\/strong>';
+  const B='<strong style="color:#f5c400;font-weight:700">';
   const I='<em style="color:#00ff9d;font-style:normal;font-weight:600">';const IE='<\/em>';
-  const SH='<div style="font-family:\'Syne\',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:10px 14px;margin:0 -2px 14px;border-radius:3px">';
   const PT='<div style="margin-bottom:18px;padding:14px 16px;background:#0a1322;border-radius:4px;border-left:3px solid rgba(0,212,255,.2);font-size:13px;line-height:1.75;color:#c8d8e8">';
+  const SHG='<div style="font-family:\'Syne\',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:10px 14px;margin:0 -2px 14px;border-radius:3px;background:rgba(0,255,157,.07);border-left:3px solid #00ff9d;color:#00ff9d">';
+  const SHR='<div style="font-family:\'Syne\',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:10px 14px;margin:8px -2px 14px;border-radius:3px;background:rgba(248,113,113,.07);border-left:3px solid #f87171;color:#f87171">';
   const anglesHtml=''
-    +SH+'style="background:rgba(0,255,157,.07);border-left:3px solid #00ff9d;color:#00ff9d">&#x1F504; REDESIGNED — NEW WEBSITE<\/div>'
+    +SHG+'&#x1F504; REDESIGNED — NEW WEBSITE<\/div>'
     +PT+B+'The website is your silent salesperson.<\/strong> 97% of consumers search online before hiring a local service business — and they\'ve already made the decision before picking up the phone. Especially in high-income zip codes, affluent homeowners vet trade businesses like they vet financial advisors.<br><br>'+I+'A cheap or sloppy website loses the job before you even get to quote it.'+IE+'<\/div>'
     +PT+B+'Local SEO is a winner-take-most game.<\/strong> The top 3 local results get 75% of clicks. A properly optimised website with service pages — "Roof Replacement in [High-Income City]" — blocks out competitors for years.<br><br>'+I+'Getting to page 1 is compounding — it gets easier to stay there.'+IE+'<\/div>'
     +PT+B+'Premium clients pay more when the brand looks premium.<\/strong> A $150/hr electrician needs a $150/hr-looking website. Pricing perception starts at the website.<br><br>'+I+'Cheap-looking = lowball offers and price shoppers. Professional-looking = customers who won\'t negotiate.'+IE+'<\/div>'
-    +SH+'style="background:rgba(248,113,113,.07);border-left:3px solid #f87171;color:#f87171;margin-top:8px">&#x274C; CURRENTLY NO WEBSITE<\/div>'
+    +SHR+'&#x274C; CURRENTLY NO WEBSITE<\/div>'
     +PT+B+'Recurring &amp; referral business needs a home base.<\/strong> Turns word-of-mouth into booked jobs automatically. Your referral network becomes an automated booking channel and sales funnel.<\/div>'
     +PT+B+'Your Google Business Profile alone isn\'t enough. It\'s a listing. Your website is a brand.<\/strong> Without a quality website you can\'t rank for high-intent keywords like "emergency HVAC repair in [city]." GBP can be suppressed — your website can\'t. You can\'t control the narrative.<\/div>'
     +PT+B+'Collect leads 24/7.<\/strong> A website with a contact form or booking widget captures after-hours leads while competitors miss them entirely.<br><br>'+I+'An emergency at 11pm sends someone to Google — not to voicemail.'+IE+'<\/div>'
