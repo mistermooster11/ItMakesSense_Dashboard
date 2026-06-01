@@ -102,7 +102,17 @@ def sheet_rows(ws, header_row=4):
 all_leads    = sheet_rows(wb['Master Leads'])
 dev_rows     = sheet_rows(wb['🛠️ Dev Tracker'])
 campaign_log = sheet_rows(wb['📊 Campaign Log'])
+sales_queue_rows = sheet_rows(wb['📞 Sales Queue'])
 dev_map      = {str(r['Lead ID']):r for r in dev_rows}
+sales_queue_map  = {}
+for _r in sales_queue_rows:
+    _lid = str(_r.get('Lead ID','') or '')
+    if _lid:
+        sales_queue_map[_lid] = {
+            'status':       str(_r.get('📋 Status','') or ''),
+            'sales_status': str(_r.get('📞 Sales Status','') or ''),
+            'live_url':     str(_r.get('🔗 Live Website','') or ''),
+        }
 
 INTEL_DIR = os.path.join(BRIEFS_DIR, 'Intel')
 DOCS_DIR  = os.path.join(BASE_DIR, 'Docs')
@@ -163,6 +173,11 @@ for lead in all_leads:
     lead['Staging URL'] = dev.get('Redesign Development Staging Site') or ''
     lead['GitHub Repo'] = dev.get('GitHub Repo Link') or ''
     lead['Template']    = dev.get('Template') or ''
+    _sq = sales_queue_map.get(lid, {})
+    lead['Sales Status']      = _sq.get('status', '')
+    lead['Sales Call Status'] = _sq.get('sales_status', '')
+    lead['In Sales Queue']    = lid in sales_queue_map
+    lead['Sales Live URL']    = _sq.get('live_url', '')
     phone_raw = str(lead.get('Phone','')).replace('(','').replace(')','').replace('-','').replace(' ','').replace('+1','')
     lead['Has Brief']  = phone_raw in brief_map
     lead['Brief File'] = brief_map.get(phone_raw, '')
@@ -668,8 +683,8 @@ tr:hover td{background:rgba(0,212,255,.04)}
     <input class="ctrl" type="text" id="pipeSearch" placeholder="Search…" oninput="filterPipe()" style="width:200px"/>
     <select class="ctrl" id="pipeStage" onchange="filterPipe()">
       <option value="">All Active Stages</option>
-      <option>🔨 Base Redesign to Template</option>
-      <option>🎨 Colors &amp; Logos Updated</option>
+      <option>📞 Pitch Ready</option>
+      <option>✅ Completed</option>
     </select>
     <select class="ctrl" id="pipeTrade" onchange="filterPipe()"><option value="">All Trades</option></select>
     <span style="margin-left:auto;font-size:11px;letter-spacing:1px;color:#2a5070" id="pipeCount"></span>
@@ -680,8 +695,9 @@ tr:hover td{background:rgba(0,212,255,.04)}
       <th onclick="sortTable('pipeTable',1)">Trade</th>
       <th onclick="sortTable('pipeTable',2)">ZIP / Area</th>
       <th onclick="sortTable('pipeTable',3)">Phone</th>
-      <th onclick="sortTable('pipeTable',4)">Stage</th>
-      <th onclick="sortTable('pipeTable',5)">Template</th>
+      <th onclick="sortTable('pipeTable',4)">Sales Status</th>
+      <th onclick="sortTable('pipeTable',5)">Dev Stage</th>
+      <th onclick="sortTable('pipeTable',6)">Template</th>
       <th>Staging URL</th>
       <th>GitHub</th>
       <th>Current Site</th>
@@ -1547,11 +1563,27 @@ function filterSales(){
 // ── Active Pipeline ───────────────────────────────────────────────────────────
 let pipeLeads=[];
 function buildPipeline(){
-  pipeLeads=LEADS.filter(l=>l['Dev Stage']==='🔨 Base Redesign to Template'||l['Dev Stage']==='🎨 Colors & Logos Updated');
+  const EXCL_SALES=['not interested'];
+  pipeLeads=LEADS.filter(l=>{
+    const devStage=(l['Dev Stage']||'').toLowerCase();
+    const salesCallStatus=(l['Sales Call Status']||'').toLowerCase();
+    const inSQ=l['In Sales Queue'];
+    // Exclude leads that are just pending with no sales activity
+    if(devStage.includes('pending')&&!inSQ) return false;
+    // Exclude not interested
+    if(EXCL_SALES.some(x=>salesCallStatus.includes(x))) return false;
+    // Include if in sales queue or dev is completed
+    return inSQ||(l['Dev Stage']==='✅ Completed');
+  });
   const trades=[...new Set(pipeLeads.map(l=>l['Trade']).filter(Boolean))].sort();
   const sel=document.getElementById('pipeTrade');
   trades.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o)});
   filterPipe();
+}
+function salesStatusBadge(salesStatus,devStage){
+  if(salesStatus) return '<span style="background:rgba(56,189,130,.15);color:#38bd82;border:1px solid rgba(56,189,130,.3);border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600">'+salesStatus+'<\/span>';
+  if(devStage==='✅ Completed') return '<span style="background:rgba(96,165,250,.12);color:#60a5fa;border:1px solid rgba(96,165,250,.25);border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600">Ready to Pitch<\/span>';
+  return '—';
 }
 function filterPipe(){
   const q=document.getElementById('pipeSearch').value.toLowerCase();
@@ -1560,22 +1592,27 @@ function filterPipe(){
   let f=pipeLeads.filter(l=>{
     const hay=[l['Business Name'],l['Trade'],l['ZIP / Area']].join(' ').toLowerCase();
     if(q&&!hay.includes(q)) return false;
-    if(stage&&l['Dev Stage']!==stage) return false;
+    if(stage){
+      // stage dropdown can match Sales Status or Dev Stage
+      if(l['Sales Status']!==stage&&l['Dev Stage']!==stage) return false;
+    }
     if(trade&&l['Trade']!==trade) return false;
     return true;
   });
-  document.getElementById('pipeCount').textContent=f.length+' ACTIVE BUILDS';
+  document.getElementById('pipeCount').textContent=f.length+' ACTIVE PROSPECTS';
   const tbody=document.querySelector('#pipeTable tbody');tbody.innerHTML='';
   f.forEach(l=>{
     const tr=document.createElement('tr');
+    const previewUrl=l['Sales Live URL']||l['Staging URL']||'';
     tr.innerHTML=`
       <td style="font-weight:600;color:#c8d8e8">${l['Business Name']||''}</td>
       <td style="color:#6a90a8">${l['Trade']||''}</td>
       <td style="font-size:11px;color:#3a6080">${l['ZIP / Area']||''}</td>
       <td>${phoneLink(l['Phone'])}</td>
+      <td>${salesStatusBadge(l['Sales Status'],l['Dev Stage'])}</td>
       <td>${stageBadge(l['Dev Stage'])}</td>
       <td style="font-size:11px;color:#3a5070">${l['Template']||'—'}</td>
-      <td>${linkCell(l['Staging URL'],'Preview')}</td>
+      <td>${linkCell(previewUrl,'Preview')}</td>
       <td>${linkCell(l['GitHub Repo'],'GitHub')}</td>
       <td>${linkCell(l['Website'],'Site')}</td>`;
     tbody.appendChild(tr);
