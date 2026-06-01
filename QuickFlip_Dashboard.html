@@ -820,10 +820,21 @@ function openBrief(id,biz){
       var s={win:'background:rgba(56,189,130,.15);color:#38bd82;border:1px solid rgba(56,189,130,.3)',gap:'background:rgba(245,158,11,.13);color:#e0a820;border:1px solid rgba(245,158,11,.3)',miss:'background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3)',ok:'background:rgba(0,212,255,.1);color:#00d4ff;border:1px solid rgba(0,212,255,.25)',na:'background:rgba(255,255,255,.04);color:#3a5570;border:1px solid rgba(255,255,255,.07)'}[type]||'background:rgba(255,255,255,.04);color:#3a5570';
       return '<span style="'+s+';border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.6">'+esc(text)+'</span>';
     }
-    function det(text,max){
+    function det(text){
       if(!text) return '';
       var t=text.replace(/\n/g,' ').trim();
-      if(t.length>max)t=t.substring(0,max)+'…';
+      // Split on first natural boundary — take the first clause, no ellipsis
+      var bounds=[' — ',' = ','; '];
+      for(var bi=0;bi<bounds.length;bi++){
+        var idx=t.indexOf(bounds[bi]);
+        if(idx>20){t=t.substring(0,idx).trim();break;}
+      }
+      // If still very long, break at last word boundary before 110 chars (no ellipsis)
+      if(t.length>110){
+        var cut=t.substring(0,110);
+        var sp=cut.lastIndexOf(' ');
+        if(sp>70)t=cut.substring(0,sp);
+      }
       return '<div style="font-size:10px;color:#3a5570;line-height:1.35;margin-top:4px;text-align:center">'+esc(t)+'</div>';
     }
     function compHasSchema(c){
@@ -861,7 +872,7 @@ function openBrief(id,biz){
        cTag:function(c){return 'gap';},cLabel:function(c){return 'Ranking now';},cDet:function(c){return c.rank;}},
       {icon:'⚔',label:'Your Advantage',
        pTag:'win',pLabel:'Their weakness = your pitch',pDet:'Reviews + owner story beats every franchise & keyword site',
-       cTag:function(c){return 'win';},cLabel:function(c){return 'Weakness';},cDet:function(c){return c.weak;}},
+       cTag:function(c){return 'miss';},cLabel:function(c){return 'Weakness';},cDet:function(c){return c.weak;}},
       {icon:'🤖',label:'AI Visibility',
        pTag:prospectAITag,pLabel:prospectAITag==='miss'?'Not cited':prospectAITag==='ok'?'Partial':'Cited',pDet:prospectAITag==='miss'?'Absent from all AI recommendation results':'Appears in some AI results',
        cTag:function(c){return compAICited(c)?'gap':'na';},cLabel:function(c){return compAICited(c)?'AI Cited':'Not cited';},cDet:function(c){return compAICited(c)?'Appears in AI search results':(c.name.split(' ')[0]+' not found in AI results');}},
@@ -880,14 +891,14 @@ function openBrief(id,biz){
       // Prospect cell (green tint)
       h+='<div style="padding:10px 12px;background:rgba(0,255,157,.025);border-right:1px solid rgba(0,212,255,.06)'+bb+';display:flex;flex-direction:column;align-items:center;gap:2px">';
       h+=tag(row.pTag,row.pLabel);
-      if(row.pDet)h+=det(row.pDet,65);
+      if(row.pDet)h+=det(row.pDet);
       h+='</div>';
       // Competitor cells
       comps.forEach(function(c,ci){
         var lastCol=ci===comps.length-1;
         h+='<div style="padding:10px 12px'+bb+(lastCol?'':';border-right:1px solid rgba(0,212,255,.06)')+';display:flex;flex-direction:column;align-items:center;gap:2px">';
         h+=tag(row.cTag(c),row.cLabel(c));
-        h+=det(row.cDet(c),65);
+        h+=det(row.cDet(c));
         h+='</div>';
       });
     });
