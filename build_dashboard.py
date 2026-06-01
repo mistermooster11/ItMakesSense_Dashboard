@@ -1053,6 +1053,122 @@ function openBrief(id,biz){
     html+='</div>';
     return html;
   }
+  // ── Competitor Scorecard ───────────────────────────────────────────────────
+  function buildCompScorecard(compRaw,aiRaw,auditRaw){
+    if(!compRaw) return '';
+    // Parse competitor blocks: ### Name (domain)\n- Differentiator: ...\n- Why they rank: ...\n- Weakness: ...
+    var comps=[];
+    var blockRx=/###\s+([^\n(]+?)(?:\s*\(([^)]*)\))?\s*\n([\s\S]*?)(?=\n###|\*\*The gap|$)/g;
+    var bm;
+    while((bm=blockRx.exec(compRaw))!==null){
+      var body=bm[3]||'';
+      var diffM=body.match(/-\s*Differentiator:\s*([^\n]+)/i);
+      var rankM=body.match(/-\s*Why they rank:\s*([^\n]+)/i);
+      var weakM=body.match(/-\s*Weakness:\s*([^\n]+)/i);
+      comps.push({name:bm[1].trim(),domain:(bm[2]||'').trim(),diff:diffM?diffM[1].trim():'',rank:rankM?rankM[1].trim():'',weak:weakM?weakM[1].trim():''});
+    }
+    if(!comps.length) return '';
+    comps=comps.slice(0,4);
+    // The gap paragraph
+    var gapM=compRaw.match(/\*\*The gap:\*\*([\s\S]*?)(?:---|$)/i);
+    var gapText=gapM?gapM[1].replace(/\n/g,' ').trim():'';
+    // AI: cited block
+    var aiCitedBlock=aiRaw?(aiRaw.match(/Who AI tools are citing[:\s]*([\s\S]*?)(?=\*\*Is |\nIs [A-Z])/i)||['',''])[1]:'';
+    // AI: is prospect mentioned?
+    var prospectAIM=aiRaw?aiRaw.match(/Is [^?]+\?\s*([^\n]+)/i):null;
+    var prospectAILine=prospectAIM?prospectAIM[1].toLowerCase():'';
+    var prospectAITag=prospectAILine.indexOf('no')>-1||prospectAILine.indexOf('absent')>-1?'miss':prospectAILine.indexOf('partial')>-1||prospectAILine.indexOf('listed')>-1?'ok':'miss';
+    // Schema: prospect (from site audit table)
+    var schemaHit=auditRaw?auditRaw.match(/JSON-LD[^\|]*\|[^\|]*\|\s*([✅❌])/i):null;
+    var prospectSchemaOk=schemaHit&&schemaHit[1]==='✅';
+    // Badge helper
+    function tag(type,text){
+      var s={win:'background:rgba(56,189,130,.15);color:#38bd82;border:1px solid rgba(56,189,130,.3)',gap:'background:rgba(245,158,11,.13);color:#e0a820;border:1px solid rgba(245,158,11,.3)',miss:'background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3)',ok:'background:rgba(0,212,255,.1);color:#00d4ff;border:1px solid rgba(0,212,255,.25)',na:'background:rgba(255,255,255,.04);color:#3a5570;border:1px solid rgba(255,255,255,.07)'}[type]||'background:rgba(255,255,255,.04);color:#3a5570';
+      return '<span style="'+s+';border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600;white-space:nowrap;line-height:1.6">'+esc(text)+'</span>';
+    }
+    function det(text,max){
+      if(!text) return '';
+      var t=text.replace(/\n/g,' ').trim();
+      if(t.length>max)t=t.substring(0,max)+'…';
+      return '<div style="font-size:10px;color:#3a5570;line-height:1.35;margin-top:4px;text-align:center">'+esc(t)+'</div>';
+    }
+    function compHasSchema(c){
+      var t=(c.rank+' '+c.diff).toLowerCase();
+      return t.indexOf('schema')>-1||t.indexOf('domain authority')>-1||t.indexOf('structured')>-1||t.indexOf('local business schema')>-1||t.indexOf('decades')>-1||t.indexOf('editorial')>-1;
+    }
+    function compAICited(c){
+      var n=c.name.split(' ')[0].toLowerCase();
+      return aiCitedBlock.toLowerCase().indexOf(n)>-1;
+    }
+    var gridCols='155px 1fr'+comps.map(function(){return ' 1fr';}).join('');
+    var h='<div style="margin-bottom:20px">';
+    h+='<div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3a7090;margin-bottom:10px">&#x1F3C6; Competitive Scorecard</div>';
+    h+='<div style="display:grid;grid-template-columns:'+gridCols+';border:1px solid rgba(0,212,255,.12);border-radius:4px;overflow:hidden">';
+    // === HEADER ROW ===
+    h+='<div style="padding:10px 14px;background:rgba(0,0,0,.3);border-bottom:1px solid rgba(0,212,255,.1);border-right:1px solid rgba(0,212,255,.1);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#2a4a60;display:flex;align-items:center">Category</div>';
+    h+='<div style="padding:10px 12px;background:rgba(0,255,157,.05);border-bottom:1px solid rgba(0,255,157,.12);border-right:1px solid rgba(0,212,255,.08);text-align:center">';
+    h+='<div style="font-size:11px;font-weight:700;color:#00ff9d">'+esc(biz)+'</div>';
+    h+='<div style="font-size:10px;color:#2a7060;margin-top:2px">'+esc(String(p.rating||''))+'★ · '+esc(String(p.reviews||''))+' reviews</div>';
+    h+='</div>';
+    comps.forEach(function(c,i){
+      var last=i===comps.length-1;
+      h+='<div style="padding:10px 12px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(0,212,255,.1)'+(last?'':';border-right:1px solid rgba(0,212,255,.08)')+';text-align:center">';
+      h+='<div style="font-size:11px;font-weight:600;color:#8ab0c8">'+esc(c.name)+'</div>';
+      if(c.domain)h+='<div style="font-size:10px;color:#2a4560;margin-top:1px">'+esc(c.domain)+'</div>';
+      h+='</div>';
+    });
+    // === DATA ROWS ===
+    var rows=[
+      {icon:'🏷',label:'Key Differentiator',
+       pTag:'win',pLabel:String(p.reviews||'?')+' Reviews · '+String(p.rating||'')+'★',pDet:'Owner-operated — strongest trust signal in the market',
+       cTag:function(c){return 'na';},cLabel:function(c){return 'Their angle';},cDet:function(c){return c.diff;}},
+      {icon:'📈',label:'Why They Rank',
+       pTag:'ok',pLabel:'QuickFlip builds this',pDet:'Schema + area pages + FAQ included from day one',
+       cTag:function(c){return 'gap';},cLabel:function(c){return 'Ranking now';},cDet:function(c){return c.rank;}},
+      {icon:'⚔',label:'Your Advantage',
+       pTag:'win',pLabel:'Their weakness = your pitch',pDet:'Reviews + owner story beats every franchise & keyword site',
+       cTag:function(c){return 'win';},cLabel:function(c){return 'Weakness';},cDet:function(c){return c.weak;}},
+      {icon:'🤖',label:'AI Visibility',
+       pTag:prospectAITag,pLabel:prospectAITag==='miss'?'Not cited':prospectAITag==='ok'?'Partial':'Cited',pDet:prospectAITag==='miss'?'Absent from all AI recommendation results':'Appears in some AI results',
+       cTag:function(c){return compAICited(c)?'gap':'na';},cLabel:function(c){return compAICited(c)?'AI Cited':'Not cited';},cDet:function(c){return compAICited(c)?'Appears in AI search results':(c.name.split(' ')[0]+' not found in AI results');}},
+      {icon:'{/}',label:'Schema & Tech SEO',
+       pTag:prospectSchemaOk?'win':'miss',pLabel:prospectSchemaOk?'Schema Present':'No Schema',pDet:prospectSchemaOk?'Google can read and classify the business':'Google can\'t classify trade or service area',
+       cTag:function(c){return compHasSchema(c)?'gap':'na';},cLabel:function(c){return compHasSchema(c)?'Has Schema':'Unknown';},cDet:function(c){return compHasSchema(c)?'Structured data drives their ranking edge':'';}},
+    ];
+    rows.forEach(function(row,ri){
+      var isLast=ri===rows.length-1;
+      var bb=isLast?'':';border-bottom:1px solid rgba(0,212,255,.05)';
+      // Category label
+      h+='<div style="padding:10px 14px;background:rgba(0,0,0,.15);border-right:1px solid rgba(0,212,255,.08)'+bb+';display:flex;align-items:flex-start;gap:7px">';
+      h+='<span style="font-size:11px;flex-shrink:0;margin-top:1px">'+row.icon+'</span>';
+      h+='<span style="font-size:11px;font-weight:600;color:#4a7090;line-height:1.4">'+esc(row.label)+'</span>';
+      h+='</div>';
+      // Prospect cell (green tint)
+      h+='<div style="padding:10px 12px;background:rgba(0,255,157,.025);border-right:1px solid rgba(0,212,255,.06)'+bb+';display:flex;flex-direction:column;align-items:center;gap:2px">';
+      h+=tag(row.pTag,row.pLabel);
+      if(row.pDet)h+=det(row.pDet,65);
+      h+='</div>';
+      // Competitor cells
+      comps.forEach(function(c,ci){
+        var lastCol=ci===comps.length-1;
+        h+='<div style="padding:10px 12px'+bb+(lastCol?'':';border-right:1px solid rgba(0,212,255,.06)')+';display:flex;flex-direction:column;align-items:center;gap:2px">';
+        h+=tag(row.cTag(c),row.cLabel(c));
+        h+=det(row.cDet(c),65);
+        h+='</div>';
+      });
+    });
+    h+='</div>'; // end grid
+    // The Gap callout
+    if(gapText){
+      h+='<div style="margin-top:10px;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.2);border-left:3px solid #00d4ff;border-radius:3px;padding:12px 16px;display:flex;align-items:flex-start;gap:10px">';
+      h+='<span style="font-size:16px;flex-shrink:0;margin-top:1px">&#x1F4A1;</span>';
+      h+='<div><div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#00d4ff;margin-bottom:5px">The QuickFlip Fix</div>';
+      h+='<div style="font-size:12px;color:#5a8a9a;line-height:1.6">'+esc(gapText)+'</div></div>';
+      h+='</div>';
+    }
+    h+='</div>'; // outer wrapper
+    return h;
+  }
   let intelTabContent='';
   if(p.has_intel){
     const serpRaw=sec(p.intel,'KEYWORD DEMAND');
@@ -1064,12 +1180,13 @@ function openBrief(id,biz){
     const aiFullHtml=m(aiRawFull);
     const painSols=buildPainSolutions(true,keyObs,frictionAngle,frictionExpl,compGap,bottomLine,aiWeaknesses);
     const warRoomHtml=buildWarRoom(painSols,pitchHooks,reviews);
+    const scorecardHtml=buildCompScorecard(compRaw,aiRawFull,auditRaw);
     intelTabContent=
        '<div class="tier-full tier-banner">&#x1F7E2; Full Intel &#x2014; Tier 2</div>'
+      +(scorecardHtml?'<div class="panel"><div class="panel-body" style="padding:16px">'+scorecardHtml+'</div></div>':'')
       +warRoomHtml
       +'<div class="panel"><div class="panel-title">&#x1F4B5; What These Jobs Pay</div><div class="panel-body">'+roiHtml+'</div></div>'
       +(aiFullHtml?'<div class="panel"><div class="panel-title">&#x1F916; AI Visibility Assessment</div><div class="panel-body">'+aiFullHtml+'</div></div>':'')
-      +'<div class="panel"><div class="panel-title">Top Competitors</div><div class="panel-body">'+m(compRaw)+'</div></div>'
       +'<div class="panel"><div class="panel-title">Market Context</div><div class="panel-body">'+mktHtml+'</div></div>'
       +'<div class="panel"><div class="panel-title">Current Site Audit</div><div class="panel-body">'+auditTable
       +(bottomLine?'<div style="background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.25);border-left:3px solid #f87171;border-radius:2px;padding:10px 14px;margin-top:14px"><span style="font-size:11px;font-weight:700;letter-spacing:1px;color:#f87171;text-transform:uppercase">Bottom Line: </span><span style="font-size:13px;color:#c8a8a8">'+esc(bottomLine)+'</span></div>':'')
