@@ -1130,7 +1130,7 @@ function openBrief(id,biz){
     });
     // === DATA ROWS ===
     var rows=[
-      {icon:'🏷',label:'Key Differentiator',
+      {icon:'🏷',label:'How They Beat You Here',
        pTag:'win',pLabel:String(p.reviews||'?')+' Reviews · '+String(p.rating||'')+'★',pDet:'Owner-operated — strongest trust signal in the market',
        cTag:function(c){return 'na';},cLabel:function(c){return 'Their angle';},cDet:function(c){return c.diff;}},
       {icon:'📈',label:'Why They Rank',
