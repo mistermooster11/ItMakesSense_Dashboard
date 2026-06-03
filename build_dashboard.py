@@ -4,10 +4,11 @@
 import openpyxl, json, os, datetime, re, random, urllib.parse
 from collections import Counter
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR   = os.path.dirname(_SCRIPT_DIR)
 EXCEL_PATH = os.path.join(BASE_DIR, "QuickFlip_Master_Leads.xlsx")
-BRIEFS_DIR = os.path.join(BASE_DIR, "Sales Briefs")
-OUT_PATH   = os.path.join(BASE_DIR, "Dashboard", "QuickFlip_Dashboard.html")
+BRIEFS_DIR = os.path.join(_SCRIPT_DIR, "Sales Briefs")
+OUT_PATH   = os.path.join(_SCRIPT_DIR, "QuickFlip_Dashboard.html")
 
 ZIP_COORDS = {
     "11001":[40.7282,-73.6603],"11005":[40.7193,-73.6999],"11428":[40.7218,-73.7376],
