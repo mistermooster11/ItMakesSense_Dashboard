@@ -5,7 +5,7 @@
 **Address:** 849 Clara Drive, Palo Alto, CA 94303
 **Website:** http://paloaltoelectric.com
 **Email:** oconnorelectric@comcast.net
-**Demo Site:** Built ✅ — https://oconnor-sons-electric-v2.vercel.app/
+**Demo Site:** Built ✅ — https://oconnor-and-sons.vercel.app/
 **Brief Date:** 2026-05-20
 
 ---
@@ -33,11 +33,11 @@
 **Preferred send method:**
 - ✉️ **Email (best):** oconnorelectric@comcast.net — subject: *"Quick question about this site"*
 - 📋 **Contact form (fallback):** http://paloaltoelectric.com
-**Demo site link:** https://oconnor-sons-electric-v2.vercel.app/
+**Demo site link:** https://oconnor-and-sons.vercel.app/
 
 ---
 
-Hey — was referred to you guys for electrical work in Palo Alto, but wasn't sure if I had the right contact. Also found this site: https://oconnor-sons-electric-v2.vercel.app/ — couldn't tell if it's connected to O'Connor & Sons. Let me know so I reach out the right way.
+Hey — was referred to you guys for electrical work in Palo Alto, but wasn't sure if I had the right contact. Also found this site: https://oconnor-and-sons.vercel.app/ — couldn't tell if it's connected to O'Connor & Sons. Let me know so I reach out the right way.
 
 ---
 
@@ -136,4 +136,4 @@ O'Connor & Sons Electric is a family-owned and operated electrical contractor ba
 - EV charger and solar wiring are the highest-growth job types in Palo Alto — if the demo highlights these, the relevance will land immediately.
 - Bay Area pricing applies — site fee range is $1,500–$3,000.
 - Best call times: 7–8am or 5–7pm
-- Demo site ready to text: https://oconnor-sons-electric-v2.vercel.app/
+- Demo site ready to text: https://oconnor-and-sons.vercel.app/
