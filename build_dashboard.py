@@ -7,7 +7,7 @@ from collections import Counter
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR   = os.path.dirname(_SCRIPT_DIR)
 EXCEL_PATH = os.path.join(BASE_DIR, "QuickFlip_Master_Leads.xlsx")
-BRIEFS_DIR = os.path.join(_SCRIPT_DIR, "Sales Briefs")
+BRIEFS_DIR = os.path.join(BASE_DIR, "Sales Briefs")
 OUT_PATH   = os.path.join(_SCRIPT_DIR, "QuickFlip_Dashboard.html")
 
 ZIP_COORDS = {
